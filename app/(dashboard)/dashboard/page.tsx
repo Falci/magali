@@ -49,7 +49,7 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted-foreground">Nothing coming up. Enjoy the quiet!</p>
             ) : (
               <div className="space-y-3">
-                {upcomingEvents.slice(0, 8).map((ev) => (
+                {upcomingEvents.slice(0, 8).map((ev: import("@/lib/events").UpcomingEvent) => (
                   <div key={ev.id} className="flex items-start gap-3 text-sm">
                     <span className="text-lg shrink-0">{EVENT_EMOJI[ev.type] ?? "📅"}</span>
                     <div className="flex-1 min-w-0">
@@ -71,8 +71,8 @@ export default async function DashboardPage() {
                   </div>
                 ))}
                 {upcomingEvents.length > 8 && (
-                  <Button variant="ghost" size="sm" asChild className="w-full">
-                    <Link href="/events">View all {upcomingEvents.length} events</Link>
+                  <Button variant="ghost" size="sm" className="w-full" render={<Link href="/events" />}>
+                    View all {upcomingEvents.length} events
                   </Button>
                 )}
               </div>
@@ -94,7 +94,7 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted-foreground">You&apos;re all caught up! Great work staying in touch.</p>
             ) : (
               <div className="space-y-3">
-                {staleContacts.slice(0, 8).map((c) => (
+                {staleContacts.slice(0, 8).map((c: { id: string; firstName: string; lastName: string | null; photo: string | null; lastInteraction: Date | null }) => (
                   <Link key={c.id} href={`/contacts/${c.id}`}>
                     <div className="flex items-center gap-3 text-sm hover:bg-muted rounded-md p-1 -m-1 transition-colors">
                       <Avatar className="h-7 w-7 shrink-0">
@@ -128,14 +128,14 @@ export default async function DashboardPage() {
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-3">
-        <Button asChild>
-          <Link href="/contacts/new"><UserPlus className="h-4 w-4 mr-2" />Add contact</Link>
+        <Button render={<Link href="/contacts/new" />}>
+          <UserPlus className="h-4 w-4 mr-2" />Add contact
         </Button>
-        <Button variant="outline" asChild>
-          <Link href="/contacts"><Users className="h-4 w-4 mr-2" />View all contacts</Link>
+        <Button variant="outline" render={<Link href="/contacts" />}>
+          <Users className="h-4 w-4 mr-2" />View all contacts
         </Button>
-        <Button variant="outline" asChild>
-          <Link href="/events"><CalendarDays className="h-4 w-4 mr-2" />All events</Link>
+        <Button variant="outline" render={<Link href="/events" />}>
+          <CalendarDays className="h-4 w-4 mr-2" />All events
         </Button>
       </div>
     </div>

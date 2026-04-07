@@ -38,9 +38,9 @@ export default async function EditContactPage({
     jobTitle: contact.jobTitle ?? "",
     birthday: contact.birthday ? format(new Date(contact.birthday), "yyyy-MM-dd") : "",
     notes: contact.notes ?? "",
-    emails: contact.emails.map((e) => ({ label: e.label, value: e.value })),
-    phones: contact.phones.map((p) => ({ label: p.label, value: p.value })),
-    addresses: contact.addresses.map((a) => ({
+    emails: contact.emails.map((e: { label: string; value: string }) => ({ label: e.label, value: e.value })),
+    phones: contact.phones.map((p: { label: string; value: string }) => ({ label: p.label, value: p.value })),
+    addresses: contact.addresses.map((a: { label: string; street: string | null; city: string | null; state: string | null; zip: string | null; country: string | null }) => ({
       label: a.label,
       street: a.street ?? "",
       city: a.city ?? "",
@@ -48,14 +48,14 @@ export default async function EditContactPage({
       zip: a.zip ?? "",
       country: a.country ?? "",
     })),
-    tagIds: contact.tags.map((t) => t.tagId),
+    tagIds: contact.tags.map((t: { tagId: string }) => t.tagId),
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/contacts/${id}`}><ArrowLeft className="h-4 w-4 mr-1" />Back</Link>
+        <Button variant="ghost" size="sm" render={<Link href={`/contacts/${id}`} />}>
+          <ArrowLeft className="h-4 w-4 mr-1" />Back
         </Button>
       </div>
       <div>

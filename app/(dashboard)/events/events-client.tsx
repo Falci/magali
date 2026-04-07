@@ -102,7 +102,7 @@ export default function EventsClient({
           <p className="text-sm text-muted-foreground">{upcomingEvents.length} upcoming in the next year</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
+          <DialogTrigger>
             <Button><Plus className="h-4 w-4 mr-2" />Add event</Button>
           </DialogTrigger>
           <DialogContent>
@@ -119,7 +119,7 @@ export default function EventsClient({
                 </div>
                 <div className="space-y-2">
                   <Label>Type</Label>
-                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v ?? form.type })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{EVENT_TYPES.map((t) => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}</SelectContent>
                   </Select>
@@ -128,14 +128,14 @@ export default function EventsClient({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Recurring</Label>
-                  <Select value={form.recurring} onValueChange={(v) => setForm({ ...form, recurring: v })}>
+                  <Select value={form.recurring} onValueChange={(v) => setForm({ ...form, recurring: v ?? "" })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{RECURRING_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Contact (optional)</Label>
-                  <Select value={form.contactId} onValueChange={(v) => setForm({ ...form, contactId: v })}>
+                  <Select value={form.contactId} onValueChange={(v) => setForm({ ...form, contactId: v ?? "" })}>
                     <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">None</SelectItem>

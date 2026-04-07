@@ -82,7 +82,7 @@ export default function RelationshipsSection({
       <CardContent className="space-y-3">
         {adding && (
           <div className="flex flex-col gap-2 border rounded-md p-3">
-            <Select value={targetId} onValueChange={setTargetId}>
+            <Select value={targetId} onValueChange={(v) => setTargetId(v ?? "")}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a contact…" />
               </SelectTrigger>
@@ -94,7 +94,7 @@ export default function RelationshipsSection({
                 ))}
               </SelectContent>
             </Select>
-            <Select value={type} onValueChange={setType}>
+            <Select value={type} onValueChange={(v) => setType(v ?? type)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

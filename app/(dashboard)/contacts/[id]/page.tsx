@@ -3,6 +3,10 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import type {
+  ContactEmail, ContactPhone, ContactAddress, Interaction,
+  Relationship, Contact, Tag, ContactTag,
+} from "@prisma/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,8 +57,8 @@ export default async function ContactDetailPage({
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/contacts"><ArrowLeft className="h-4 w-4 mr-1" />Contacts</Link>
+        <Button variant="ghost" size="sm" render={<Link href="/contacts" />}>
+          <ArrowLeft className="h-4 w-4 mr-1" />Contacts
         </Button>
       </div>
 
@@ -89,8 +93,8 @@ export default async function ContactDetailPage({
           )}
         </div>
         <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/contacts/${id}/edit`}><Edit className="h-4 w-4 mr-1" />Edit</Link>
+          <Button variant="outline" size="sm" render={<Link href={`/contacts/${id}/edit`} />}>
+            <Edit className="h-4 w-4 mr-1" />Edit
           </Button>
           <DeleteContactButton contactId={id} />
         </div>

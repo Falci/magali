@@ -196,7 +196,7 @@ export default function ContactForm({
           {form.emails.length === 0 && <p className="text-sm text-muted-foreground">No emails added.</p>}
           {form.emails.map((email, i) => (
             <div key={i} className="flex gap-2">
-              <Select value={email.label} onValueChange={(v) => updateEmail(i, "label", v)}>
+              <Select value={email.label} onValueChange={(v) => updateEmail(i, "label", v ?? email.label)}>
                 <SelectTrigger className="w-28 shrink-0"><SelectValue /></SelectTrigger>
                 <SelectContent>{EMAIL_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
               </Select>
@@ -219,7 +219,7 @@ export default function ContactForm({
           {form.phones.length === 0 && <p className="text-sm text-muted-foreground">No phones added.</p>}
           {form.phones.map((phone, i) => (
             <div key={i} className="flex gap-2">
-              <Select value={phone.label} onValueChange={(v) => updatePhone(i, "label", v)}>
+              <Select value={phone.label} onValueChange={(v) => updatePhone(i, "label", v ?? phone.label)}>
                 <SelectTrigger className="w-28 shrink-0"><SelectValue /></SelectTrigger>
                 <SelectContent>{PHONE_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
               </Select>
@@ -245,7 +245,7 @@ export default function ContactForm({
               <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => removeAddress(i)}>
                 <Trash2 className="h-3 w-3" />
               </Button>
-              <Select value={addr.label} onValueChange={(v) => updateAddress(i, "label", v)}>
+              <Select value={addr.label} onValueChange={(v) => updateAddress(i, "label", v ?? addr.label)}>
                 <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                 <SelectContent>{ADDRESS_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
               </Select>

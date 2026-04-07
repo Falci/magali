@@ -65,11 +65,9 @@ export default function ContactsClient({
           <h1 className="text-2xl font-semibold">Contacts</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} people</p>
         </div>
-        <Button asChild>
-          <Link href="/contacts/new">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add contact
-          </Link>
+        <Button render={<Link href="/contacts/new" />}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add contact
         </Button>
       </div>
 

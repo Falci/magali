@@ -7,10 +7,10 @@ export async function GET(req: NextRequest) {
   if (error) return error;
 
   const { searchParams } = new URL(req.url);
-  const upcoming = searchParams.get("upcoming");
+  const upcomingParam = searchParams.get("upcoming");
 
-  if (upcoming) {
-    const days = parseInt(upcoming, 10) || 30;
+  if (upcomingParam) {
+    const days = parseInt(upcomingParam, 10) || 30;
     const now = new Date();
     const end = new Date(now);
     end.setDate(end.getDate() + days);
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       orderBy: { date: "asc" },
     });
 
-    const upcoming = [];
+    const upcoming: Array<{ nextDate: Date } & typeof events[number]> = [];
     for (const ev of events) {
       if (!ev.recurring) {
         const d = new Date(ev.date);
