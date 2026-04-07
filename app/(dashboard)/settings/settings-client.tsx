@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Copy, RefreshCw, Send } from "lucide-react";
+import { Copy, Download, RefreshCw, Send } from "lucide-react";
 
 type Settings = {
   telegramBotToken?: string | null;
@@ -78,6 +78,34 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
       toast.error("Failed to send test notification. Check your configuration.");
     }
     setTesting(false);
+  }
+
+  const [monicaDomain, setMonicaDomain] = useState("");
+  const [monicaToken, setMonicaToken] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
+
+  async function handleMonicaImport() {
+    if (!monicaDomain.trim() || !monicaToken.trim()) {
+      toast.error("Domain and token are required");
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    const res = await fetch("/api/import/monica", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ domain: monicaDomain.trim(), token: monicaToken.trim() }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setImportResult(data);
+      toast.success(`Imported ${data.imported} contacts`);
+      router.refresh();
+    } else {
+      toast.error(data.error ?? "Import failed");
+    }
+    setImporting(false);
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -249,6 +277,65 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
           {testing ? "Sending…" : "Send test notification"}
         </Button>
       </div>
+
+      {/* Import */}
+      <div>
+        <h2 className="text-lg font-semibold">Import</h2>
+        <p className="text-sm text-muted-foreground">One-time imports from other services</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Import from Monica HQ</CardTitle>
+          <CardDescription>
+            Enter your Monica instance URL and a personal access token to import all contacts.
+            Partial contacts (added as relationships only) are skipped.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Monica instance URL</Label>
+            <Input
+              placeholder="https://app.monicahq.com"
+              value={monicaDomain}
+              onChange={(e) => setMonicaDomain(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>API token</Label>
+            <Input
+              type="password"
+              placeholder="Personal access token"
+              value={monicaToken}
+              onChange={(e) => setMonicaToken(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Generate one in Monica under Settings → API access tokens.
+            </p>
+          </div>
+          {importResult && (
+            <div className="rounded-md border p-3 text-sm space-y-1">
+              <p className="font-medium">
+                Import complete — {importResult.imported} imported, {importResult.skipped} skipped
+              </p>
+              {importResult.errors.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-destructive">{importResult.errors.length} error(s)</summary>
+                  <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                    {importResult.errors.map((e, i) => (
+                      <li key={i} className="truncate">{e}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+          <Button onClick={handleMonicaImport} disabled={importing}>
+            <Download className="h-4 w-4 mr-2" />
+            {importing ? "Importing…" : "Import contacts"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
