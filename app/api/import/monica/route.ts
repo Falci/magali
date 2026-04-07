@@ -109,15 +109,15 @@ export async function POST(req: NextRequest) {
       const { day, month, year } = parseBirthday(c.information.dates.birthdate);
 
       // Separate contact fields by type
-      const emails = c.contact_fields
+      const emails = (c.contact_fields ?? [])
         .filter((f) => f.contact_field_type.type === "email")
         .map((f) => ({ label: "home", value: f.value }));
 
-      const phones = c.contact_fields
+      const phones = (c.contact_fields ?? [])
         .filter((f) => f.contact_field_type.type === "phone")
         .map((f) => ({ label: "mobile", value: f.value }));
 
-      const addresses = c.addresses.map((a) => ({
+      const addresses = (c.addresses ?? []).map((a) => ({
         label: a.name || "home",
         street: a.street ?? null,
         city: a.city ?? null,
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
 
       // Upsert tags
       const tagIds: string[] = [];
-      for (const t of c.tags) {
+      for (const t of (c.tags ?? [])) {
         const tag = await prisma.tag.upsert({
           where: { name: t.name },
           create: { name: t.name },
