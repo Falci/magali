@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApiSession } from "@/lib/api-auth";
 
@@ -16,7 +16,7 @@ type MonicaTag = { id: number; name: string };
 type MonicaBirthdate = {
   is_age_based: boolean;
   is_year_unknown: boolean;
-  date: string | null; // ISO 8601
+  date: string | null;
   age: number | null;
 };
 type MonicaContact = {
@@ -27,13 +27,8 @@ type MonicaContact = {
   nickname: string | null;
   description: string | null;
   information: {
-    dates: {
-      birthdate: MonicaBirthdate;
-    };
-    career: {
-      job: string | null;
-      company: string | null;
-    };
+    dates: { birthdate: MonicaBirthdate };
+    career: { job: string | null; company: string | null };
   };
   contact_fields: MonicaContactField[];
   addresses: MonicaAddress[];
@@ -68,7 +63,6 @@ async function fetchAllMonicaContacts(domain: string, token: string): Promise<Mo
 
 function parseBirthday(b: MonicaBirthdate | null): { day: number | null; month: number | null; year: number | null } {
   if (!b || !b.date) return { day: null, month: null, year: null };
-
   const d = new Date(b.date);
   return {
     day: d.getUTCDate(),
@@ -77,91 +71,128 @@ function parseBirthday(b: MonicaBirthdate | null): { day: number | null; month: 
   };
 }
 
+function sse(event: object): string {
+  return `data: ${JSON.stringify(event)}\n\n`;
+}
+
 export async function POST(req: NextRequest) {
   const { error } = await requireApiSession();
   if (error) return error;
 
   const { domain, token } = await req.json();
   if (!domain || !token) {
-    return NextResponse.json({ error: "domain and token are required" }, { status: 400 });
+    return new Response(
+      sse({ type: "error", message: "domain and token are required" }),
+      { status: 400, headers: { "Content-Type": "text/event-stream" } }
+    );
   }
 
-  let monicaContacts: MonicaContact[];
-  try {
-    monicaContacts = await fetchAllMonicaContacts(domain, token);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Failed to fetch from Monica: ${message}` }, { status: 502 });
-  }
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: object) => controller.enqueue(new TextEncoder().encode(sse(event)));
 
-  let imported = 0;
-  let skipped = 0;
-  const errors: string[] = [];
+      try {
+        send({ type: "status", message: "Connecting to Monica…" });
 
-  for (const c of monicaContacts) {
-    // Skip partial contacts — they are relationship sub-contacts, not standalone people
-    if (c.is_partial) {
-      skipped++;
-      continue;
-    }
+        let monicaContacts: MonicaContact[];
+        try {
+          monicaContacts = await fetchAllMonicaContacts(domain, token);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          send({ type: "error", message: `Failed to fetch from Monica: ${message}` });
+          controller.close();
+          return;
+        }
 
-    try {
-      const { day, month, year } = parseBirthday(c.information.dates.birthdate);
+        const total = monicaContacts.filter((c) => !c.is_partial).length;
+        send({ type: "status", message: `Found ${monicaContacts.length} contacts (${total} to import)…` });
 
-      // Separate contact fields by type
-      const emails = (c.contact_fields ?? [])
-        .filter((f) => f.contact_field_type.type === "email")
-        .map((f) => ({ label: "home", value: f.value }));
+        let imported = 0;
+        let skipped = 0;
+        const errors: string[] = [];
+        let done = 0;
 
-      const phones = (c.contact_fields ?? [])
-        .filter((f) => f.contact_field_type.type === "phone")
-        .map((f) => ({ label: "mobile", value: f.value }));
+        for (const c of monicaContacts) {
+          if (c.is_partial) {
+            skipped++;
+            continue;
+          }
 
-      const addresses = (c.addresses ?? []).map((a) => ({
-        label: a.name || "home",
-        street: a.street ?? null,
-        city: a.city ?? null,
-        state: a.province ?? null,
-        zip: a.postal_code ?? null,
-        country: a.country?.name ?? null,
-      }));
+          const name = `${c.first_name}${c.last_name ? " " + c.last_name : ""}`;
+          done++;
+          send({ type: "progress", current: done, total, name });
 
-      // Upsert tags
-      const tagIds: string[] = [];
-      for (const t of (c.tags ?? [])) {
-        const tag = await prisma.tag.upsert({
-          where: { name: t.name },
-          create: { name: t.name },
-          update: {},
-        });
-        tagIds.push(tag.id);
+          try {
+            const { day, month, year } = parseBirthday(c.information.dates.birthdate);
+
+            const emails = (c.contact_fields ?? [])
+              .filter((f) => f.contact_field_type.type === "email")
+              .map((f) => ({ label: "home", value: f.value }));
+
+            const phones = (c.contact_fields ?? [])
+              .filter((f) => f.contact_field_type.type === "phone")
+              .map((f) => ({ label: "mobile", value: f.value }));
+
+            const addresses = (c.addresses ?? []).map((a) => ({
+              label: a.name || "home",
+              street: a.street ?? null,
+              city: a.city ?? null,
+              state: a.province ?? null,
+              zip: a.postal_code ?? null,
+              country: a.country?.name ?? null,
+            }));
+
+            const tagIds: string[] = [];
+            for (const t of (c.tags ?? [])) {
+              const tag = await prisma.tag.upsert({
+                where: { name: t.name },
+                create: { name: t.name },
+                update: {},
+              });
+              tagIds.push(tag.id);
+            }
+
+            await prisma.contact.create({
+              data: {
+                firstName: c.first_name,
+                lastName: c.last_name ?? null,
+                nickname: c.nickname ?? null,
+                company: c.information.career.company ?? null,
+                jobTitle: c.information.career.job ?? null,
+                notes: c.description ?? null,
+                birthdayDay: day,
+                birthdayMonth: month,
+                birthdayYear: year,
+                emails: emails.length ? { create: emails } : undefined,
+                phones: phones.length ? { create: phones } : undefined,
+                addresses: addresses.length ? { create: addresses } : undefined,
+                tags: tagIds.length ? { create: tagIds.map((tagId) => ({ tagId })) } : undefined,
+              },
+            });
+
+            imported++;
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            errors.push(`${name}: ${message}`);
+            skipped++;
+          }
+        }
+
+        send({ type: "done", imported, skipped, errors });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        send({ type: "error", message });
+      } finally {
+        controller.close();
       }
+    },
+  });
 
-      await prisma.contact.create({
-        data: {
-          firstName: c.first_name,
-          lastName: c.last_name ?? null,
-          nickname: c.nickname ?? null,
-          company: c.information.career.company ?? null,
-          jobTitle: c.information.career.job ?? null,
-          notes: c.description ?? null,
-          birthdayDay: day,
-          birthdayMonth: month,
-          birthdayYear: year,
-          emails: emails.length ? { create: emails } : undefined,
-          phones: phones.length ? { create: phones } : undefined,
-          addresses: addresses.length ? { create: addresses } : undefined,
-          tags: tagIds.length ? { create: tagIds.map((tagId) => ({ tagId })) } : undefined,
-        },
-      });
-
-      imported++;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      errors.push(`${c.first_name} ${c.last_name ?? ""}: ${message}`);
-      skipped++;
-    }
-  }
-
-  return NextResponse.json({ imported, skipped, errors });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }

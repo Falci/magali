@@ -83,6 +83,8 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
   const [monicaDomain, setMonicaDomain] = useState("");
   const [monicaToken, setMonicaToken] = useState("");
   const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; name: string } | null>(null);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
 
   async function handleMonicaImport() {
@@ -91,20 +93,53 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
       return;
     }
     setImporting(true);
+    setImportStatus(null);
+    setImportProgress(null);
     setImportResult(null);
+
     const res = await fetch("/api/import/monica", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ domain: monicaDomain.trim(), token: monicaToken.trim() }),
     });
-    const data = await res.json();
-    if (res.ok) {
-      setImportResult(data);
-      toast.success(`Imported ${data.imported} contacts`);
-      router.refresh();
-    } else {
-      toast.error(data.error ?? "Import failed");
+
+    if (!res.body) {
+      toast.error("Import failed: no response body");
+      setImporting(false);
+      return;
     }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        const data = line.replace(/^data: /, "").trim();
+        if (!data) continue;
+        try {
+          const event = JSON.parse(data);
+          if (event.type === "status") setImportStatus(event.message);
+          else if (event.type === "progress") setImportProgress(event);
+          else if (event.type === "error") { toast.error(event.message); setImporting(false); return; }
+          else if (event.type === "done") {
+            setImportResult(event);
+            setImportStatus(null);
+            setImportProgress(null);
+            toast.success(`Imported ${event.imported} contacts`);
+            router.refresh();
+            setImporting(false);
+            return;
+          }
+        } catch { /* ignore parse errors */ }
+      }
+    }
+
     setImporting(false);
   }
 
@@ -313,20 +348,41 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
               Generate one in Monica under Settings → API access tokens.
             </p>
           </div>
-          {importResult && (
-            <div className="rounded-md border p-3 text-sm space-y-1">
-              <p className="font-medium">
-                Import complete — {importResult.imported} imported, {importResult.skipped} skipped
-              </p>
-              {importResult.errors.length > 0 && (
-                <details className="mt-2">
-                  <summary className="cursor-pointer text-destructive">{importResult.errors.length} error(s)</summary>
-                  <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                    {importResult.errors.map((e, i) => (
-                      <li key={i} className="truncate">{e}</li>
-                    ))}
-                  </ul>
-                </details>
+          {(importing || importResult) && (
+            <div className="rounded-md border p-3 text-sm space-y-2">
+              {importStatus && (
+                <p className="text-muted-foreground">{importStatus}</p>
+              )}
+              {importProgress && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Importing {importProgress.name}…</span>
+                    <span>{importProgress.current} / {importProgress.total}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-200"
+                      style={{ width: `${Math.round((importProgress.current / importProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {importResult && (
+                <>
+                  <p className="font-medium">
+                    Import complete — {importResult.imported} imported, {importResult.skipped} skipped
+                  </p>
+                  {importResult.errors.length > 0 && (
+                    <details>
+                      <summary className="cursor-pointer text-destructive">{importResult.errors.length} error(s)</summary>
+                      <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                        {importResult.errors.map((e, i) => (
+                          <li key={i} className="truncate">{e}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </>
               )}
             </div>
           )}
