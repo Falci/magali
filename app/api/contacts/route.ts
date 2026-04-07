@@ -52,7 +52,6 @@ export async function POST(req: NextRequest) {
   const contact = await prisma.contact.create({
     data: {
       ...rest,
-      birthday: rest.birthday ? new Date(rest.birthday) : null,
       emails: emails?.length ? { create: emails } : undefined,
       phones: phones?.length ? { create: phones } : undefined,
       addresses: addresses?.length ? { create: addresses } : undefined,

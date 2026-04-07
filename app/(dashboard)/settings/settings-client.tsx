@@ -126,7 +126,10 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
         <CardHeader>
           <CardTitle>Telegram notifications</CardTitle>
           <CardDescription>
-            Create a bot via @BotFather. Get your chat ID by messaging @userinfobot.
+            Create a bot via{" "}
+            <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="underline">@BotFather</a>.
+            {" "}Get your chat ID by messaging{" "}
+            <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="underline">@userinfobot</a>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

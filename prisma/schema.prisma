@@ -65,9 +65,12 @@ model Contact {
   uid       String    @unique @default(cuid())
   firstName String
   lastName  String?
-  nickname  String?
-  birthday  DateTime?
-  notes     String?
+  nickname      String?
+  birthdayDay   Int?     // 1–31
+  birthdayMonth Int?     // 1–12
+  birthdayYear  Int?
+  staleDays     Int?     // null = use global default from Settings
+  notes         String?
   photo     String?
   company   String?
   jobTitle  String?
@@ -135,17 +138,18 @@ model Interaction {
 }
 
 model Event {
-  id        String   @id @default(cuid())
-  uid       String   @unique @default(cuid())
-  contactId String?
-  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  title     String
-  date      DateTime
-  recurring String?
-  type      String
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  uid                String   @unique @default(cuid())
+  contactId          String?
+  contact            Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  title              String
+  date               DateTime
+  recurring          String?
+  type               String
+  notes              String?
+  reminderDaysBefore Int?     // null = use global default from Settings
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model Tag {

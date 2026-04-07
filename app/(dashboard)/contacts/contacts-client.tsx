@@ -19,7 +19,6 @@ type Contact = {
   nickname: string | null;
   company: string | null;
   photo: string | null;
-  birthday: Date | string | null;
   emails: { label: string; value: string }[];
   phones: { label: string; value: string }[];
   tags: { tag: Tag }[];

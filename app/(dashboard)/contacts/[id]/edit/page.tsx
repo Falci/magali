@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import ContactForm from "@/components/contacts/contact-form";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { format } from "date-fns";
 
 export default async function EditContactPage({
   params,
@@ -36,7 +35,10 @@ export default async function EditContactPage({
     nickname: contact.nickname ?? "",
     company: contact.company ?? "",
     jobTitle: contact.jobTitle ?? "",
-    birthday: contact.birthday ? format(new Date(contact.birthday), "yyyy-MM-dd") : "",
+    birthdayMonth: contact.birthdayMonth ? String(contact.birthdayMonth) : "",
+    birthdayDay: contact.birthdayDay ? String(contact.birthdayDay) : "",
+    birthdayYear: contact.birthdayYear ? String(contact.birthdayYear) : "",
+    staleDays: contact.staleDays ? String(contact.staleDays) : "",
     notes: contact.notes ?? "",
     emails: contact.emails.map((e: { label: string; value: string }) => ({ label: e.label, value: e.value })),
     phones: contact.phones.map((p: { label: string; value: string }) => ({ label: p.label, value: p.value })),

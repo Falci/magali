@@ -21,7 +21,10 @@ type ContactFormData = {
   nickname: string;
   company: string;
   jobTitle: string;
-  birthday: string;
+  birthdayMonth: string; // "1"–"12" or ""
+  birthdayDay: string;   // "1"–"31" or ""
+  birthdayYear: string;  // 4-digit year or ""
+  staleDays: string;     // number or "" (blank = use global default)
   notes: string;
   emails: MultiField[];
   phones: MultiField[];
@@ -33,13 +36,23 @@ const EMAIL_LABELS = ["home", "work", "other"];
 const PHONE_LABELS = ["mobile", "home", "work", "other"];
 const ADDRESS_LABELS = ["home", "work", "other"];
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
+
 const defaultForm = (): ContactFormData => ({
   firstName: "",
   lastName: "",
   nickname: "",
   company: "",
   jobTitle: "",
-  birthday: "",
+  birthdayMonth: "",
+  birthdayDay: "",
+  birthdayYear: "",
+  staleDays: "",
   notes: "",
   emails: [],
   phones: [],
@@ -65,38 +78,25 @@ export default function ContactForm({
     setForm((f) => ({ ...f, [field]: value }));
   }
 
-  function addEmail() {
-    set("emails", [...form.emails, { label: "home", value: "" }]);
-  }
+  function addEmail() { set("emails", [...form.emails, { label: "home", value: "" }]); }
   function updateEmail(i: number, field: keyof MultiField, value: string) {
-    const updated = form.emails.map((e, idx) => (idx === i ? { ...e, [field]: value } : e));
-    set("emails", updated);
+    set("emails", form.emails.map((e, idx) => idx === i ? { ...e, [field]: value } : e));
   }
-  function removeEmail(i: number) {
-    set("emails", form.emails.filter((_, idx) => idx !== i));
-  }
+  function removeEmail(i: number) { set("emails", form.emails.filter((_, idx) => idx !== i)); }
 
-  function addPhone() {
-    set("phones", [...form.phones, { label: "mobile", value: "" }]);
-  }
+  function addPhone() { set("phones", [...form.phones, { label: "mobile", value: "" }]); }
   function updatePhone(i: number, field: keyof MultiField, value: string) {
-    const updated = form.phones.map((p, idx) => (idx === i ? { ...p, [field]: value } : p));
-    set("phones", updated);
+    set("phones", form.phones.map((p, idx) => idx === i ? { ...p, [field]: value } : p));
   }
-  function removePhone(i: number) {
-    set("phones", form.phones.filter((_, idx) => idx !== i));
-  }
+  function removePhone(i: number) { set("phones", form.phones.filter((_, idx) => idx !== i)); }
 
   function addAddress() {
     set("addresses", [...form.addresses, { label: "home", street: "", city: "", state: "", zip: "", country: "" }]);
   }
   function updateAddress(i: number, field: string, value: string) {
-    const updated = form.addresses.map((a, idx) => (idx === i ? { ...a, [field]: value } : a));
-    set("addresses", updated);
+    set("addresses", form.addresses.map((a, idx) => idx === i ? { ...a, [field]: value } : a));
   }
-  function removeAddress(i: number) {
-    set("addresses", form.addresses.filter((_, idx) => idx !== i));
-  }
+  function removeAddress(i: number) { set("addresses", form.addresses.filter((_, idx) => idx !== i)); }
 
   function toggleTag(tagId: string) {
     set("tagIds", form.tagIds.includes(tagId)
@@ -133,7 +133,10 @@ export default function ContactForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        birthday: form.birthday || null,
+        birthdayMonth: form.birthdayMonth ? parseInt(form.birthdayMonth) : null,
+        birthdayDay: form.birthdayDay ? parseInt(form.birthdayDay) : null,
+        birthdayYear: form.birthdayYear ? parseInt(form.birthdayYear) : null,
+        staleDays: form.staleDays ? parseInt(form.staleDays) : null,
         emails: form.emails.filter((e) => e.value.trim()),
         phones: form.phones.filter((p) => p.value.trim()),
         addresses: form.addresses.filter((a) => a.street || a.city || a.country),
@@ -170,16 +173,65 @@ export default function ContactForm({
             <Input id="nickname" value={form.nickname} onChange={(e) => set("nickname", e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="birthday">Birthday</Label>
-            <Input id="birthday" type="date" value={form.birthday} onChange={(e) => set("birthday", e.target.value)} />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="company">Company</Label>
             <Input id="company" value={form.company} onChange={(e) => set("company", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="jobTitle">Job title</Label>
             <Input id="jobTitle" value={form.jobTitle} onChange={(e) => set("jobTitle", e.target.value)} />
+          </div>
+
+          {/* Birthday — three independent optional selects */}
+          <div className="space-y-2 col-span-2">
+            <Label>Birthday <span className="text-muted-foreground font-normal text-xs">(all fields optional)</span></Label>
+            <div className="grid grid-cols-3 gap-2">
+              <Select value={form.birthdayMonth} onValueChange={(v) => set("birthdayMonth", v ?? "")}>
+                <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">— Month —</SelectItem>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={form.birthdayDay} onValueChange={(v) => set("birthdayDay", v ?? "")}>
+                <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">— Day —</SelectItem>
+                  {DAYS.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Year"
+                value={form.birthdayYear}
+                onChange={(e) => set("birthdayYear", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                maxLength={4}
+              />
+            </div>
+            {(form.birthdayMonth || form.birthdayDay || form.birthdayYear) && (
+              <p className="text-xs text-muted-foreground">
+                Preview:{" "}
+                {[
+                  form.birthdayMonth ? MONTHS[parseInt(form.birthdayMonth) - 1] : null,
+                  form.birthdayDay || null,
+                  form.birthdayYear || null,
+                ].filter(Boolean).join(" ")}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2 col-span-2">
+            <Label>Stale contact reminder <span className="text-muted-foreground font-normal text-xs">(days without contact — leave blank for global default)</span></Label>
+            <Input
+              type="number"
+              min={1}
+              max={3650}
+              placeholder="Use global default"
+              value={form.staleDays}
+              onChange={(e) => set("staleDays", e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { formatBirthday } from "@/lib/birthday";
 import type {
   ContactEmail, ContactPhone, ContactAddress, Interaction,
   Relationship, Contact, Tag, ContactTag,
@@ -105,10 +106,10 @@ export default async function ContactDetailPage({
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-sm">Contact info</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {contact.birthday && (
+            {formatBirthday(contact) && (
               <div className="flex items-center gap-2">
                 <Cake className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span>{format(new Date(contact.birthday), "MMMM d, yyyy")}</span>
+                <span>{formatBirthday(contact)}</span>
               </div>
             )}
             {contact.emails.map((e) => (
@@ -138,7 +139,7 @@ export default async function ContactDetailPage({
                 <span className="text-xs text-muted-foreground ml-auto">{a.label}</span>
               </div>
             ))}
-            {!contact.birthday && !contact.emails.length && !contact.phones.length && !contact.addresses.length && (
+            {!formatBirthday(contact) && !contact.emails.length && !contact.phones.length && !contact.addresses.length && (
               <p className="text-muted-foreground">No contact info yet.</p>
             )}
           </CardContent>

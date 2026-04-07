@@ -49,6 +49,7 @@ export default function EventsClient({
     recurring: "",
     contactId: "",
     notes: "",
+    reminderDaysBefore: "",
   });
 
   async function handleCreate(e: React.FormEvent) {
@@ -62,12 +63,13 @@ export default function EventsClient({
         ...form,
         recurring: form.recurring || null,
         contactId: form.contactId || null,
+        reminderDaysBefore: form.reminderDaysBefore ? parseInt(form.reminderDaysBefore) : null,
       }),
     });
     if (res.ok) {
       toast.success("Event created");
       setOpen(false);
-      setForm({ title: "", date: "", type: "custom", recurring: "", contactId: "", notes: "" });
+      setForm({ title: "", date: "", type: "custom", recurring: "", contactId: "", notes: "", reminderDaysBefore: "" });
       router.refresh();
     } else {
       toast.error("Failed to create event");
@@ -145,6 +147,17 @@ export default function EventsClient({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Remind me <span className="text-muted-foreground font-normal text-xs">(days before, leave blank for default)</span></Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  placeholder="Use global default"
+                  value={form.reminderDaysBefore}
+                  onChange={(e) => setForm({ ...form, reminderDaysBefore: e.target.value })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Notes</Label>

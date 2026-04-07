@@ -8,17 +8,23 @@ export async function runNotifications() {
   const settings = await prisma.settings.findUnique({ where: { id: "singleton" } });
   if (!settings) return;
 
-  const reminderDays = settings.reminderDaysBefore ?? 7;
-  const staleDays = settings.staleDays ?? 90;
+  const globalReminderDays = settings.reminderDaysBefore ?? 7;
+  const globalStaleDays = settings.staleDays ?? 90;
 
-  const [upcomingEvents, staleContacts] = await Promise.all([
-    getUpcomingEvents(reminderDays),
-    getStaleContacts(staleDays),
+  // Fetch a wide window and filter per-event below
+  const maxWindow = Math.max(globalReminderDays, 30);
+  const [allEvents, allStale] = await Promise.all([
+    getUpcomingEvents(maxWindow),
+    getStaleContacts(globalStaleDays),
   ]);
 
   const lines: string[] = [];
 
-  for (const ev of upcomingEvents) {
+  // Filter events: only include if daysUntil <= their specific threshold
+  for (const ev of allEvents) {
+    const threshold = ev.reminderDaysBefore ?? globalReminderDays;
+    if (ev.daysUntil > threshold) continue;
+
     if (ev.daysUntil === 0) {
       lines.push(`${ev.type === "birthday" ? "🎂" : "📅"} <b>${ev.title}</b> — Today!`);
     } else {
@@ -26,9 +32,25 @@ export async function runNotifications() {
     }
   }
 
-  for (const c of staleContacts.slice(0, 5)) {
-    const since = c.lastInteraction
-      ? `${Math.floor((Date.now() - new Date(c.lastInteraction).getTime()) / 86400000)} days ago`
+  // Stale contacts: respect per-contact staleDays override
+  const contacts = await prisma.contact.findMany({
+    select: {
+      id: true, firstName: true, lastName: true, staleDays: true,
+      interactions: { orderBy: { date: "desc" }, take: 1, select: { date: true } },
+    },
+  });
+
+  const now = Date.now();
+  const staleToNotify = contacts.filter((c) => {
+    const threshold = (c.staleDays ?? globalStaleDays) * 86400000;
+    const last = c.interactions[0]?.date;
+    return !last || now - new Date(last).getTime() >= threshold;
+  }).slice(0, 5);
+
+  for (const c of staleToNotify) {
+    const last = c.interactions[0]?.date;
+    const since = last
+      ? `${Math.floor((now - new Date(last).getTime()) / 86400000)} days ago`
       : "never";
     lines.push(`👤 <b>${c.firstName} ${c.lastName ?? ""}</b> — last contact: ${since}`);
   }

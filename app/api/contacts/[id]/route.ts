@@ -49,7 +49,6 @@ export async function PUT(
     where: { id },
     data: {
       ...rest,
-      birthday: rest.birthday ? new Date(rest.birthday) : null,
       emails: emails?.length ? { create: emails } : undefined,
       phones: phones?.length ? { create: phones } : undefined,
       addresses: addresses?.length ? { create: addresses } : undefined,
