@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { requireApiSession } from "@/lib/api-auth";
+
+export async function GET(req: NextRequest) {
+  const { error } = await requireApiSession();
+  if (error) return error;
+
+  const { searchParams } = new URL(req.url);
+  const upcoming = searchParams.get("upcoming");
+
+  if (upcoming) {
+    const days = parseInt(upcoming, 10) || 30;
+    const now = new Date();
+    const end = new Date(now);
+    end.setDate(end.getDate() + days);
+
+    // Get all events and expand recurring ones into the window
+    const events = await prisma.event.findMany({
+      include: { contact: { select: { id: true, firstName: true, lastName: true } } },
+      orderBy: { date: "asc" },
+    });
+
+    const upcoming = [];
+    for (const ev of events) {
+      if (!ev.recurring) {
+        const d = new Date(ev.date);
+        if (d >= now && d <= end) upcoming.push({ ...ev, nextDate: d });
+      } else if (ev.recurring === "YEARLY") {
+        // Find the next occurrence within the window
+        const base = new Date(ev.date);
+        const thisYear = new Date(base);
+        thisYear.setFullYear(now.getFullYear());
+        const nextYear = new Date(base);
+        nextYear.setFullYear(now.getFullYear() + 1);
+
+        for (const candidate of [thisYear, nextYear]) {
+          if (candidate >= now && candidate <= end) {
+            upcoming.push({ ...ev, nextDate: candidate });
+            break;
+          }
+        }
+      }
+    }
+
+    upcoming.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
+    return NextResponse.json(upcoming);
+  }
+
+  const events = await prisma.event.findMany({
+    include: { contact: { select: { id: true, firstName: true, lastName: true } } },
+    orderBy: { date: "asc" },
+  });
+  return NextResponse.json(events);
+}
+
+export async function POST(req: NextRequest) {
+  const { error } = await requireApiSession();
+  if (error) return error;
+
+  const body = await req.json();
+  const event = await prisma.event.create({
+    data: {
+      ...body,
+      date: new Date(body.date),
+      contactId: body.contactId || null,
+    },
+    include: { contact: { select: { id: true, firstName: true, lastName: true } } },
+  });
+  return NextResponse.json(event, { status: 201 });
+}
