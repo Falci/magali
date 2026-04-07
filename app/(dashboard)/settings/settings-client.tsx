@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Copy, Download, RefreshCw, Send } from "lucide-react";
 
 type Settings = {
@@ -80,6 +81,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
     setTesting(false);
   }
 
+  // Monica import state
   const [monicaDomain, setMonicaDomain] = useState("");
   const [monicaToken, setMonicaToken] = useState("");
   const [importing, setImporting] = useState(false);
@@ -144,254 +146,268 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const davUser = "magali";
-  const davPassword = settings.davToken ?? "(generate a token first)";
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">Configure notifications and integrations</p>
+        <p className="text-sm text-muted-foreground">Configure notifications, integrations, and imports</p>
       </div>
 
-      {/* Reminders */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Reminder thresholds</CardTitle>
-          <CardDescription>Control when you receive notifications</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Days before event to notify</Label>
-            <Input
-              type="number"
-              min={1}
-              max={30}
-              value={settings.reminderDaysBefore ?? 7}
-              onChange={(e) => set("reminderDaysBefore", parseInt(e.target.value) || 7)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Days without contact (stale threshold)</Label>
-            <Input
-              type="number"
-              min={7}
-              max={365}
-              value={settings.staleDays ?? 90}
-              onChange={(e) => set("staleDays", parseInt(e.target.value) || 90)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general">
+        <TabsList>
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="dav">CalDAV / CardDAV</TabsTrigger>
+          <TabsTrigger value="import">Import</TabsTrigger>
+        </TabsList>
 
-      {/* Telegram */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Telegram notifications</CardTitle>
-          <CardDescription>
-            Create a bot via{" "}
-            <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="underline">@BotFather</a>.
-            {" "}Get your chat ID by messaging{" "}
-            <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="underline">@userinfobot</a>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Bot token</Label>
-            <Input
-              type="password"
-              placeholder="123456:ABC-DEF…"
-              value={settings.telegramBotToken ?? ""}
-              onChange={(e) => set("telegramBotToken", e.target.value || null)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Chat ID</Label>
-            <Input
-              placeholder="123456789"
-              value={settings.telegramChatId ?? ""}
-              onChange={(e) => set("telegramChatId", e.target.value || null)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* SMTP */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Email notifications (SMTP)</CardTitle>
-          <CardDescription>Receive daily digests via email</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>SMTP host</Label>
-              <Input placeholder="smtp.example.com" value={settings.smtpHost ?? ""} onChange={(e) => set("smtpHost", e.target.value || null)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Port</Label>
-              <Input type="number" placeholder="587" value={settings.smtpPort ?? ""} onChange={(e) => set("smtpPort", parseInt(e.target.value) || null)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Username</Label>
-              <Input value={settings.smtpUser ?? ""} onChange={(e) => set("smtpUser", e.target.value || null)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Password</Label>
-              <Input type="password" value={settings.smtpPass ?? ""} onChange={(e) => set("smtpPass", e.target.value || null)} />
-            </div>
-            <div className="space-y-2">
-              <Label>From address</Label>
-              <Input placeholder="magali@example.com" value={settings.smtpFrom ?? ""} onChange={(e) => set("smtpFrom", e.target.value || null)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Send digest to</Label>
-              <Input placeholder="you@example.com" value={settings.smtpTo ?? ""} onChange={(e) => set("smtpTo", e.target.value || null)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* CalDAV/CardDAV */}
-      <Card>
-        <CardHeader>
-          <CardTitle>CalDAV / CardDAV sync</CardTitle>
-          <CardDescription>
-            Use these credentials in Apple Calendar, Google Calendar, or any DAV client.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>CalDAV URL</Label>
-            <div className="flex gap-2">
-              <Input readOnly value={`${origin}/api/dav/caldav/`} className="font-mono text-sm" />
-              <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(`${origin}/api/dav/caldav/`); toast.success("Copied"); }}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>CardDAV URL</Label>
-            <div className="flex gap-2">
-              <Input readOnly value={`${origin}/api/dav/carddav/`} className="font-mono text-sm" />
-              <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(`${origin}/api/dav/carddav/`); toast.success("Copied"); }}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <Separator />
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Username</Label>
-              <Input readOnly value={davUser} className="font-mono text-sm" />
-            </div>
-            <div className="space-y-2">
-              <Label>Password (DAV token)</Label>
-              <div className="flex gap-2">
-                <Input readOnly value={settings.davToken ?? ""} type="password" className="font-mono text-sm" />
-                <Button variant="outline" size="icon" onClick={regenerateDavToken} title="Regenerate token">
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
+        {/* General */}
+        <TabsContent value="general" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Reminder thresholds</CardTitle>
+              <CardDescription>
+                Global defaults — individual contacts and events can override these.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Days before event to notify</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={settings.reminderDaysBefore ?? 7}
+                  onChange={(e) => set("reminderDaysBefore", parseInt(e.target.value) || 7)}
+                />
               </div>
-            </div>
-          </div>
-          {!settings.davToken && (
-            <p className="text-sm text-muted-foreground">
-              Generate a DAV token to enable sync. Existing connections will need to be updated when you regenerate.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <Label>Days without contact (stale threshold)</Label>
+                <Input
+                  type="number"
+                  min={7}
+                  max={365}
+                  value={settings.staleDays ?? 90}
+                  onChange={(e) => set("staleDays", parseInt(e.target.value) || 90)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </TabsContent>
 
-      <div className="flex gap-3">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save settings"}
-        </Button>
-        <Button variant="outline" onClick={testNotifications} disabled={testing}>
-          <Send className="h-4 w-4 mr-2" />
-          {testing ? "Sending…" : "Send test notification"}
-        </Button>
-      </div>
+        {/* Notifications */}
+        <TabsContent value="notifications" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Telegram</CardTitle>
+              <CardDescription>
+                Create a bot via{" "}
+                <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="underline">@BotFather</a>.
+                {" "}Get your chat ID from{" "}
+                <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="underline">@userinfobot</a>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Bot token</Label>
+                <Input
+                  type="password"
+                  placeholder="123456:ABC-DEF…"
+                  value={settings.telegramBotToken ?? ""}
+                  onChange={(e) => set("telegramBotToken", e.target.value || null)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Chat ID</Label>
+                <Input
+                  placeholder="123456789"
+                  value={settings.telegramChatId ?? ""}
+                  onChange={(e) => set("telegramChatId", e.target.value || null)}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Import */}
-      <div>
-        <h2 className="text-lg font-semibold">Import</h2>
-        <p className="text-sm text-muted-foreground">One-time imports from other services</p>
-      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Email (SMTP)</CardTitle>
+              <CardDescription>Receive daily digests via email</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Host</Label>
+                  <Input placeholder="smtp.example.com" value={settings.smtpHost ?? ""} onChange={(e) => set("smtpHost", e.target.value || null)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Port</Label>
+                  <Input type="number" placeholder="587" value={settings.smtpPort ?? ""} onChange={(e) => set("smtpPort", parseInt(e.target.value) || null)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Username</Label>
+                  <Input value={settings.smtpUser ?? ""} onChange={(e) => set("smtpUser", e.target.value || null)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input type="password" value={settings.smtpPass ?? ""} onChange={(e) => set("smtpPass", e.target.value || null)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>From address</Label>
+                  <Input placeholder="magali@example.com" value={settings.smtpFrom ?? ""} onChange={(e) => set("smtpFrom", e.target.value || null)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Send digest to</Label>
+                  <Input placeholder="you@example.com" value={settings.smtpTo ?? ""} onChange={(e) => set("smtpTo", e.target.value || null)} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Import from Monica HQ</CardTitle>
-          <CardDescription>
-            Enter your Monica instance URL and a personal access token to import all contacts.
-            Partial contacts (added as relationships only) are skipped.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Monica instance URL</Label>
-            <Input
-              placeholder="https://app.monicahq.com"
-              value={monicaDomain}
-              onChange={(e) => setMonicaDomain(e.target.value)}
-            />
+          <div className="flex gap-3">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="outline" onClick={testNotifications} disabled={testing}>
+              <Send className="h-4 w-4 mr-2" />
+              {testing ? "Sending…" : "Send test notification"}
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label>API token</Label>
-            <Input
-              type="password"
-              placeholder="Personal access token"
-              value={monicaToken}
-              onChange={(e) => setMonicaToken(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Generate one in Monica under Settings → API access tokens.
-            </p>
-          </div>
-          {(importing || importResult) && (
-            <div className="rounded-md border p-3 text-sm space-y-2">
-              {importStatus && (
-                <p className="text-muted-foreground">{importStatus}</p>
-              )}
-              {importProgress && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Importing {importProgress.name}…</span>
-                    <span>{importProgress.current} / {importProgress.total}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-200"
-                      style={{ width: `${Math.round((importProgress.current / importProgress.total) * 100)}%` }}
-                    />
+        </TabsContent>
+
+        {/* DAV */}
+        <TabsContent value="dav" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>CalDAV / CardDAV sync</CardTitle>
+              <CardDescription>
+                Use these credentials in Apple Calendar, Google Calendar, or any DAV client.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>CalDAV URL</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={`${origin}/api/dav/caldav/`} className="font-mono text-sm" />
+                  <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(`${origin}/api/dav/caldav/`); toast.success("Copied"); }}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>CardDAV URL</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={`${origin}/api/dav/carddav/`} className="font-mono text-sm" />
+                  <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(`${origin}/api/dav/carddav/`); toast.success("Copied"); }}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Username</Label>
+                  <Input readOnly value="magali" className="font-mono text-sm" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Password (DAV token)</Label>
+                  <div className="flex gap-2">
+                    <Input readOnly value={settings.davToken ?? ""} type="password" className="font-mono text-sm" />
+                    <Button variant="outline" size="icon" onClick={regenerateDavToken} title="Regenerate token">
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
+              </div>
+              {!settings.davToken && (
+                <p className="text-sm text-muted-foreground">
+                  Generate a DAV token to enable sync. Existing connections will need to be updated when you regenerate.
+                </p>
               )}
-              {importResult && (
-                <>
-                  <p className="font-medium">
-                    Import complete — {importResult.imported} imported, {importResult.skipped} skipped
-                  </p>
-                  {importResult.errors.length > 0 && (
-                    <details>
-                      <summary className="cursor-pointer text-destructive">{importResult.errors.length} error(s)</summary>
-                      <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                        {importResult.errors.map((e, i) => (
-                          <li key={i} className="truncate">{e}</li>
-                        ))}
-                      </ul>
-                    </details>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Import */}
+        <TabsContent value="import" className="space-y-4 pt-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import from Monica HQ</CardTitle>
+              <CardDescription>
+                Enter your Monica instance URL and a personal access token to import all contacts.
+                Partial contacts (added as relationships only) are skipped.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Monica instance URL</Label>
+                <Input
+                  placeholder="https://app.monicahq.com"
+                  value={monicaDomain}
+                  onChange={(e) => setMonicaDomain(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>API token</Label>
+                <Input
+                  type="password"
+                  placeholder="Personal access token"
+                  value={monicaToken}
+                  onChange={(e) => setMonicaToken(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Generate one in Monica under Settings → API access tokens.
+                </p>
+              </div>
+              {(importing || importResult) && (
+                <div className="rounded-md border p-3 text-sm space-y-2">
+                  {importStatus && (
+                    <p className="text-muted-foreground">{importStatus}</p>
                   )}
-                </>
+                  {importProgress && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Importing {importProgress.name}…</span>
+                        <span>{importProgress.current} / {importProgress.total}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-200"
+                          style={{ width: `${Math.round((importProgress.current / importProgress.total) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {importResult && (
+                    <>
+                      <p className="font-medium">
+                        Import complete — {importResult.imported} imported, {importResult.skipped} skipped
+                      </p>
+                      {importResult.errors.length > 0 && (
+                        <details>
+                          <summary className="cursor-pointer text-destructive">{importResult.errors.length} error(s)</summary>
+                          <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                            {importResult.errors.map((e, i) => (
+                              <li key={i} className="truncate">{e}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-          <Button onClick={handleMonicaImport} disabled={importing}>
-            <Download className="h-4 w-4 mr-2" />
-            {importing ? "Importing…" : "Import contacts"}
-          </Button>
-        </CardContent>
-      </Card>
+              <Button onClick={handleMonicaImport} disabled={importing}>
+                <Download className="h-4 w-4 mr-2" />
+                {importing ? "Importing…" : "Import contacts"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
