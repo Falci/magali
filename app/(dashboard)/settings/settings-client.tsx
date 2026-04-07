@@ -86,8 +86,8 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
   const [monicaToken, setMonicaToken] = useState("");
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
-  const [importProgress, setImportProgress] = useState<{ current: number; total: number; name: string } | null>(null);
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; phase: string; name: string } | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; relImported: number; relSkipped: number; errors: string[] } | null>(null);
 
   async function handleMonicaImport() {
     if (!monicaDomain.trim() || !monicaToken.trim()) {
@@ -370,7 +370,9 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
                   {importProgress && (
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Importing {importProgress.name}…</span>
+                        <span>
+                          {importProgress.phase === "relationships" ? "Relationships" : importProgress.name ? `Importing ${importProgress.name}` : "Processing"}…
+                        </span>
                         <span>{importProgress.current} / {importProgress.total}</span>
                       </div>
                       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -384,7 +386,10 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
                   {importResult && (
                     <>
                       <p className="font-medium">
-                        Import complete — {importResult.imported} imported, {importResult.skipped} skipped
+                        Import complete — {importResult.imported} contacts, {importResult.relImported} relationships
+                        {(importResult.skipped > 0 || importResult.relSkipped > 0) && (
+                          <span className="text-muted-foreground font-normal"> ({importResult.skipped + importResult.relSkipped} skipped)</span>
+                        )}
                       </p>
                       {importResult.errors.length > 0 && (
                         <details>

@@ -34,31 +34,35 @@ type MonicaContact = {
   addresses: MonicaAddress[];
   tags: MonicaTag[];
 };
+type MonicaRelationship = {
+  id: number;
+  relationship_type: { name: string };
+  of_contact: { id: number; first_name: string; last_name: string | null };
+};
 
-async function fetchAllMonicaContacts(domain: string, token: string): Promise<MonicaContact[]> {
-  const base = domain.replace(/\/$/, "");
+async function fetchAllMonicaContacts(base: string, token: string): Promise<MonicaContact[]> {
   const all: MonicaContact[] = [];
   let page = 1;
-
   while (true) {
     const res = await fetch(`${base}/api/contacts?limit=100&page=${page}&with=addresses,contact_fields,tags`, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Monica API error ${res.status}: ${text}`);
-    }
-
+    if (!res.ok) throw new Error(`Monica API error ${res.status}: ${await res.text()}`);
     const json = await res.json();
-    const contacts: MonicaContact[] = json.data ?? [];
-    all.push(...contacts);
-
+    all.push(...(json.data ?? []));
     if (!json.meta?.current_page || json.meta.current_page >= json.meta.last_page) break;
     page++;
   }
-
   return all;
+}
+
+async function fetchRelationships(base: string, token: string, contactId: number): Promise<MonicaRelationship[]> {
+  const res = await fetch(`${base}/api/contacts/${contactId}/relationships`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data ?? [];
 }
 
 function parseBirthday(b: MonicaBirthdate | null): { day: number | null; month: number | null; year: number | null } {
@@ -71,8 +75,8 @@ function parseBirthday(b: MonicaBirthdate | null): { day: number | null; month: 
   };
 }
 
-function sse(event: object): string {
-  return `data: ${JSON.stringify(event)}\n\n`;
+function sse(event: object): Uint8Array {
+  return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
 }
 
 export async function POST(req: NextRequest) {
@@ -82,45 +86,43 @@ export async function POST(req: NextRequest) {
   const { domain, token } = await req.json();
   if (!domain || !token) {
     return new Response(
-      sse({ type: "error", message: "domain and token are required" }),
+      `data: ${JSON.stringify({ type: "error", message: "domain and token are required" })}\n\n`,
       { status: 400, headers: { "Content-Type": "text/event-stream" } }
     );
   }
 
+  const base = domain.replace(/\/$/, "");
+
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: object) => controller.enqueue(new TextEncoder().encode(sse(event)));
+      const send = (event: object) => controller.enqueue(sse(event));
 
       try {
         send({ type: "status", message: "Connecting to Monica…" });
 
         let monicaContacts: MonicaContact[];
         try {
-          monicaContacts = await fetchAllMonicaContacts(domain, token);
+          monicaContacts = await fetchAllMonicaContacts(base, token);
         } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : String(err);
-          send({ type: "error", message: `Failed to fetch from Monica: ${message}` });
+          send({ type: "error", message: err instanceof Error ? err.message : String(err) });
           controller.close();
           return;
         }
 
-        const total = monicaContacts.filter((c) => !c.is_partial).length;
-        send({ type: "status", message: `Found ${monicaContacts.length} contacts (${total} to import)…` });
+        const fullContacts = monicaContacts.filter((c) => !c.is_partial);
+        const total = fullContacts.length;
+        send({ type: "status", message: `Found ${monicaContacts.length} contacts (${total} to import, ${monicaContacts.length - total} partial skipped)…` });
 
+        // Phase 1: import contacts, track monicaId → localId
         let imported = 0;
         let skipped = 0;
         const errors: string[] = [];
-        let done = 0;
+        const monicaToLocal = new Map<number, string>(); // monicaId → local cuid
 
-        for (const c of monicaContacts) {
-          if (c.is_partial) {
-            skipped++;
-            continue;
-          }
-
+        for (let i = 0; i < fullContacts.length; i++) {
+          const c = fullContacts[i];
           const name = `${c.first_name}${c.last_name ? " " + c.last_name : ""}`;
-          done++;
-          send({ type: "progress", current: done, total, name });
+          send({ type: "progress", current: i + 1, total, phase: "contacts", name });
 
           try {
             const { day, month, year } = parseBirthday(c.information.dates.birthdate);
@@ -152,7 +154,7 @@ export async function POST(req: NextRequest) {
               tagIds.push(tag.id);
             }
 
-            await prisma.contact.create({
+            const created = await prisma.contact.create({
               data: {
                 firstName: c.first_name,
                 lastName: c.last_name ?? null,
@@ -170,18 +172,61 @@ export async function POST(req: NextRequest) {
               },
             });
 
+            monicaToLocal.set(c.id, created.id);
             imported++;
           } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : String(err);
-            errors.push(`${name}: ${message}`);
+            errors.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
             skipped++;
           }
         }
 
-        send({ type: "done", imported, skipped, errors });
+        // Phase 2: import relationships
+        send({ type: "status", message: `Contacts done. Importing relationships for ${monicaToLocal.size} contacts…` });
+
+        let relImported = 0;
+        let relSkipped = 0;
+        const createdPairs = new Set<string>();
+        let relDone = 0;
+
+        for (const [monicaId, localId] of monicaToLocal) {
+          relDone++;
+          send({ type: "progress", current: relDone, total: monicaToLocal.size, phase: "relationships", name: "" });
+
+          const rels = await fetchRelationships(base, token, monicaId);
+          for (const rel of rels) {
+            const relatedLocalId = monicaToLocal.get(rel.of_contact.id);
+            if (!relatedLocalId) { relSkipped++; continue; } // related contact was partial / not imported
+
+            // Deduplicate: skip if we've already created this pair (either direction)
+            const pairKey = [localId, relatedLocalId].sort().join(":");
+            if (createdPairs.has(pairKey)) continue;
+            createdPairs.add(pairKey);
+
+            try {
+              await prisma.relationship.create({
+                data: {
+                  fromId: localId,
+                  toId: relatedLocalId,
+                  type: rel.relationship_type.name,
+                },
+              });
+              relImported++;
+            } catch {
+              relSkipped++;
+            }
+          }
+        }
+
+        send({
+          type: "done",
+          imported,
+          skipped,
+          relImported,
+          relSkipped,
+          errors,
+        });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        send({ type: "error", message });
+        send({ type: "error", message: err instanceof Error ? err.message : String(err) });
       } finally {
         controller.close();
       }
