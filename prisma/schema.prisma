@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Better Auth tables ──────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String    @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}
+
+// ── CRM tables ──────────────────────────────────────────────────────────────
+
+model Contact {
+  id        String    @id @default(cuid())
+  uid       String    @unique @default(cuid())
+  firstName String
+  lastName  String?
+  nickname  String?
+  birthday  DateTime?
+  notes     String?
+  photo     String?
+  company   String?
+  jobTitle  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  emails            ContactEmail[]
+  phones            ContactPhone[]
+  addresses         ContactAddress[]
+  tags              ContactTag[]
+  interactions      Interaction[]
+  events            Event[]
+  relationshipsFrom Relationship[]  @relation("RelFrom")
+  relationshipsTo   Relationship[]  @relation("RelTo")
+}
+
+model ContactEmail {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  label     String  @default("home")
+  value     String
+}
+
+model ContactPhone {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  label     String  @default("mobile")
+  value     String
+}
+
+model ContactAddress {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  label     String  @default("home")
+  street    String?
+  city      String?
+  state     String?
+  zip       String?
+  country   String?
+}
+
+model Relationship {
+  id      String  @id @default(cuid())
+  fromId  String
+  from    Contact @relation("RelFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId    String
+  to      Contact @relation("RelTo", fields: [toId], references: [id], onDelete: Cascade)
+  type    String
+  notes   String?
+
+  @@unique([fromId, toId])
+}
+
+model Interaction {
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  date      DateTime @default(now())
+  type      String
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  uid       String   @unique @default(cuid())
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  title     String
+  date      DateTime
+  recurring String?
+  type      String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  color    String?
+  contacts ContactTag[]
+}
+
+model ContactTag {
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+}
+
+model Settings {
+  id                 String  @id @default("singleton")
+  telegramBotToken   String?
+  telegramChatId     String?
+  smtpHost           String?
+  smtpPort           Int?
+  smtpUser           String?
+  smtpPass           String?
+  smtpFrom           String?
+  smtpTo             String?
+  davToken           String?
+  staleDays          Int     @default(90)
+  reminderDaysBefore Int     @default(7)
+}
