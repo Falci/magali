@@ -17,11 +17,9 @@ import { Trash2, Plus, Users, ExternalLink, Pencil } from "lucide-react";
 import { ContactCombobox, type ContactOption } from "@/components/contacts/contact-combobox";
 
 const RELATIONSHIP_TYPES = [
-  "friend", "family", "colleague", "partner", "spouse",
-  "acquaintance", "mentor", "mentee",
-  "child", "parent", "sibling",
-  "ex-spouse", "ex-partner",
-  "other",
+  "acquaintance", "child", "colleague", "ex-partner", "ex-spouse",
+  "family", "friend", "mentor", "mentee", "other",
+  "parent", "partner", "sibling", "spouse",
 ];
 
 const MONTHS = [
