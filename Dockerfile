@@ -38,6 +38,7 @@ COPY --from=builder /app/public ./public
 
 # Copy Prisma files needed at runtime
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/node_modules ./node_modules
 
 USER nextjs
