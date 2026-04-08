@@ -1,44 +1,12 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApiSession } from "@/lib/api-auth";
-
-// Monica API field types
-type MonicaContactField = { value: string; contact_field_type: { type: string; name: string } };
-type MonicaAddress = {
-  name: string;
-  street: string | null;
-  city: string | null;
-  province: string | null;
-  postal_code: string | null;
-  country: { iso: string; name: string } | null;
-};
-type MonicaTag = { id: number; name: string };
-type MonicaBirthdate = {
-  is_age_based: boolean;
-  is_year_unknown: boolean;
-  date: string | null;
-  age: number | null;
-};
-type MonicaContact = {
-  id: number;
-  is_partial: boolean;
-  first_name: string;
-  last_name: string | null;
-  nickname: string | null;
-  description: string | null;
-  information: {
-    dates: { birthdate: MonicaBirthdate };
-    career: { job: string | null; company: string | null };
-  };
-  contact_fields: MonicaContactField[];
-  addresses: MonicaAddress[];
-  tags: MonicaTag[];
-};
-type MonicaRelationship = {
-  id: number;
-  relationship_type: { name: string };
-  of_contact: { id: number; first_name: string; last_name: string | null };
-};
+import {
+  parseBirthday,
+  transformContact,
+  type MonicaContact,
+  type MonicaRelationship,
+} from "@/lib/monica-import";
 
 async function fetchAllMonicaContacts(base: string, token: string): Promise<MonicaContact[]> {
   const all: MonicaContact[] = [];
@@ -65,15 +33,6 @@ async function fetchRelationships(base: string, token: string, contactId: number
   return { rels: json.data ?? [], error: null };
 }
 
-function parseBirthday(b: MonicaBirthdate | null): { day: number | null; month: number | null; year: number | null } {
-  if (!b || !b.date) return { day: null, month: null, year: null };
-  const d = new Date(b.date);
-  return {
-    day: d.getUTCDate(),
-    month: d.getUTCMonth() + 1,
-    year: b.is_year_unknown ? null : d.getUTCFullYear(),
-  };
-}
 
 function sse(event: object): Uint8Array {
   return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
@@ -125,30 +84,13 @@ export async function POST(req: NextRequest) {
           send({ type: "progress", current: i + 1, total, phase: "contacts", name });
 
           try {
-            const { day, month, year } = parseBirthday(c.information.dates.birthdate);
-
-            const emails = (c.contact_fields ?? [])
-              .filter((f) => f.contact_field_type.type === "email")
-              .map((f) => ({ label: "home", value: f.value }));
-
-            const phones = (c.contact_fields ?? [])
-              .filter((f) => f.contact_field_type.type === "phone")
-              .map((f) => ({ label: "mobile", value: f.value }));
-
-            const addresses = (c.addresses ?? []).map((a) => ({
-              label: a.name || "home",
-              street: a.street ?? null,
-              city: a.city ?? null,
-              state: a.province ?? null,
-              zip: a.postal_code ?? null,
-              country: a.country?.name ?? null,
-            }));
+            const t = transformContact(c);
 
             const tagIds: string[] = [];
-            for (const t of (c.tags ?? [])) {
+            for (const name of t.tagNames) {
               const tag = await prisma.tag.upsert({
-                where: { name: t.name },
-                create: { name: t.name },
+                where: { name },
+                create: { name },
                 update: {},
               });
               tagIds.push(tag.id);
@@ -156,18 +98,18 @@ export async function POST(req: NextRequest) {
 
             const created = await prisma.contact.create({
               data: {
-                firstName: c.first_name,
-                lastName: c.last_name ?? null,
-                nickname: c.nickname ?? null,
-                company: c.information.career.company ?? null,
-                jobTitle: c.information.career.job ?? null,
-                notes: c.description ?? null,
-                birthdayDay: day,
-                birthdayMonth: month,
-                birthdayYear: year,
-                emails: emails.length ? { create: emails } : undefined,
-                phones: phones.length ? { create: phones } : undefined,
-                addresses: addresses.length ? { create: addresses } : undefined,
+                firstName: t.firstName,
+                lastName: t.lastName,
+                nickname: t.nickname,
+                company: t.company,
+                jobTitle: t.jobTitle,
+                notes: t.notes,
+                birthdayDay: t.birthdayDay,
+                birthdayMonth: t.birthdayMonth,
+                birthdayYear: t.birthdayYear,
+                emails: t.emails.length ? { create: t.emails } : undefined,
+                phones: t.phones.length ? { create: t.phones } : undefined,
+                addresses: t.addresses.length ? { create: t.addresses } : undefined,
                 tags: tagIds.length ? { create: tagIds.map((tagId) => ({ tagId })) } : undefined,
               },
             });
