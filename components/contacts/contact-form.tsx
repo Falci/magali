@@ -66,6 +66,16 @@ const defaultForm = (): ContactFormData => ({
 
 type CompanyOption = { id: string; name: string };
 
+/** Returns "dmy" | "mdy" | "ymd" based on the date format string */
+function birthdayFieldOrder(dateFormat: string): ["month" | "day" | "year", "month" | "day" | "year", "month" | "day" | "year"] {
+  const fmt = dateFormat.toLowerCase();
+  const dFirst = /^d/.test(fmt);
+  const yFirst = /^y/.test(fmt);
+  if (dFirst) return ["day", "month", "year"];
+  if (yFirst) return ["year", "month", "day"];
+  return ["month", "day", "year"];
+}
+
 export default function ContactForm({
   initialData,
   contactId,
@@ -75,6 +85,7 @@ export default function ContactForm({
   phoneLabels = ["mobile", "home", "work", "other"],
   addressLabels = ["home", "work", "other"],
   globalStaleDays = 90,
+  dateFormat = "MMM d, yyyy",
 }: {
   initialData?: Partial<ContactFormData>;
   contactId?: string;
@@ -84,6 +95,7 @@ export default function ContactForm({
   phoneLabels?: string[];
   addressLabels?: string[];
   globalStaleDays?: number;
+  dateFormat?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -91,6 +103,8 @@ export default function ContactForm({
   const [newTagName, setNewTagName] = useState("");
   const [companySearch, setCompanySearch] = useState(initialData?.companyName ?? "");
   const [companyOpen, setCompanyOpen] = useState(false);
+
+  const bdayOrder = birthdayFieldOrder(dateFormat);
 
   function set(field: keyof ContactFormData, value: unknown) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -271,34 +285,43 @@ export default function ContactForm({
             </Select>
           </div>
 
-          {/* Birthday — three independent optional selects */}
+          {/* Birthday — three independent optional selects, order matches date format */}
           <div className="space-y-2 col-span-2">
             <Label>Birthday <span className="text-muted-foreground font-normal text-xs">(all fields optional)</span></Label>
             <div className="grid grid-cols-3 gap-2">
-              <Select value={form.birthdayMonth} onValueChange={(v) => set("birthdayMonth", v ?? "")}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Month" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">— Month —</SelectItem>
-                  {MONTHS.map((m, i) => (
-                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={form.birthdayDay} onValueChange={(v) => set("birthdayDay", v ?? "")}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Day" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">— Day —</SelectItem>
-                  {DAYS.map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder="Year"
-                value={form.birthdayYear}
-                onChange={(e) => set("birthdayYear", e.target.value.replace(/\D/g, "").slice(0, 4))}
-                maxLength={4}
-              />
+              {bdayOrder.map((field) => {
+                if (field === "month") return (
+                  <Select key="month" value={form.birthdayMonth} onValueChange={(v) => set("birthdayMonth", v ?? "")}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Month" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">— Month —</SelectItem>
+                      {MONTHS.map((m, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+                if (field === "day") return (
+                  <Select key="day" value={form.birthdayDay} onValueChange={(v) => set("birthdayDay", v ?? "")}>
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Day" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">— Day —</SelectItem>
+                      {DAYS.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                );
+                return (
+                  <Input
+                    key="year"
+                    placeholder="Year"
+                    value={form.birthdayYear}
+                    onChange={(e) => set("birthdayYear", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    maxLength={4}
+                  />
+                );
+              })}
             </div>
             {(form.birthdayMonth || form.birthdayDay || form.birthdayYear) && (
               <p className="text-xs text-muted-foreground">

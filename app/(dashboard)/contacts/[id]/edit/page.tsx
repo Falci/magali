@@ -27,7 +27,7 @@ export default async function EditContactPage({
     }),
     prisma.tag.findMany({ orderBy: { name: "asc" } }),
     prisma.fieldLabel.findMany({ orderBy: [{ field: "asc" }, { label: "asc" }] }),
-    prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true } }),
+    prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true, dateFormat: true } }),
     prisma.company.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
@@ -95,6 +95,7 @@ export default async function EditContactPage({
         phoneLabels={labels.phone}
         addressLabels={labels.address}
         globalStaleDays={settings?.staleDays ?? 90}
+        dateFormat={settings?.dateFormat ?? "MMM d, yyyy"}
       />
     </div>
   );

@@ -24,7 +24,7 @@ export default async function NewContactPage({
   const [allTags, fieldLabels, settings, allCompanies] = await Promise.all([
     prisma.tag.findMany({ orderBy: { name: "asc" } }),
     prisma.fieldLabel.findMany({ orderBy: [{ field: "asc" }, { label: "asc" }] }),
-    prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true } }),
+    prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true, dateFormat: true } }),
     prisma.company.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
@@ -43,6 +43,7 @@ export default async function NewContactPage({
         phoneLabels={labels.phone}
         addressLabels={labels.address}
         globalStaleDays={settings?.staleDays ?? 90}
+        dateFormat={settings?.dateFormat ?? "MMM d, yyyy"}
         initialData={{ firstName: firstName ?? "", lastName: lastName ?? "" }}
       />
     </div>
