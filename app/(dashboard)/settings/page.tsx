@@ -24,10 +24,11 @@ export default async function SettingsPage() {
     skipDuplicates: true,
   });
 
-  const [settings, fieldLabels] = await Promise.all([
+  const [settings, fieldLabels, tags] = await Promise.all([
     prisma.settings.findUnique({ where: { id: "singleton" } }),
     prisma.fieldLabel.findMany({ orderBy: [{ field: "asc" }, { label: "asc" }] }),
+    prisma.tag.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { contacts: true } } } }),
   ]);
 
-  return <SettingsClient initialSettings={settings ?? null} fieldLabels={fieldLabels} />;
+  return <SettingsClient initialSettings={settings ?? null} fieldLabels={fieldLabels} initialTags={tags} />;
 }
