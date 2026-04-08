@@ -2,14 +2,12 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, EyeOff } from "lucide-react";
 
 type Tag = { id: string; name: string; color: string | null };
 type Contact = {
@@ -19,6 +17,7 @@ type Contact = {
   nickname: string | null;
   company: string | null;
   photo: string | null;
+  staleDays: number | null;
   emails: { label: string; value: string }[];
   phones: { label: string; value: string }[];
   tags: { tag: Tag }[];
@@ -34,10 +33,14 @@ export default function ContactsClient({
 }) {
   const [q, setQ] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [showDeprioritized, setShowDeprioritized] = useState(false);
 
   const filtered = useMemo(() => {
     const lower = q.toLowerCase();
     return initialContacts.filter((c) => {
+      // staleDays === 0 means stale notification disabled → deprioritized
+      if (!showDeprioritized && c.staleDays === 0) return false;
+
       const matchesQ =
         !q ||
         c.firstName.toLowerCase().includes(lower) ||
@@ -51,7 +54,9 @@ export default function ContactsClient({
 
       return matchesQ && matchesTag;
     });
-  }, [initialContacts, q, activeTag]);
+  }, [initialContacts, q, activeTag, showDeprioritized]);
+
+  const deprioritizedCount = initialContacts.filter((c) => c.staleDays === 0).length;
 
   function initials(c: Contact) {
     return `${c.firstName[0] ?? ""}${c.lastName?.[0] ?? ""}`.toUpperCase();
@@ -64,10 +69,23 @@ export default function ContactsClient({
           <h1 className="text-2xl font-semibold">Contacts</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} people</p>
         </div>
-        <Button render={<Link href="/contacts/new" />}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add contact
-        </Button>
+        <div className="flex gap-2">
+          {deprioritizedCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDeprioritized((v) => !v)}
+              className="text-muted-foreground"
+            >
+              <EyeOff className="h-4 w-4 mr-1.5" />
+              {showDeprioritized ? "Hide deprioritized" : `+${deprioritizedCount} hidden`}
+            </Button>
+          )}
+          <Button render={<Link href="/contacts/new" />}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add contact
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">

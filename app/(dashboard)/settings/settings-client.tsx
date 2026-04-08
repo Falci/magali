@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Copy, Download, RefreshCw, Send, X, Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Copy, Download, RefreshCw, Send, X, Plus, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
 
 type Settings = {
   telegramBotToken?: string | null;
@@ -23,6 +24,8 @@ type Settings = {
   davToken?: string | null;
   staleDays?: number | null;
   reminderDaysBefore?: number | null;
+  dateFormat?: string | null;
+  vapidPublicKey?: string | null;
 };
 
 type FieldLabel = { id: string; field: string; label: string };
@@ -127,6 +130,100 @@ export default function SettingsClient({
     setTesting(false);
   }
 
+  // DAV token visibility state
+  const [showDavToken, setShowDavToken] = useState(false);
+  const [showMacSetup, setShowMacSetup] = useState(false);
+
+  // Web push state
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [generatingVapid, setGeneratingVapid] = useState(false);
+
+  async function generateVapidKeys() {
+    setGeneratingVapid(true);
+    const res = await fetch("/api/push/vapid", { method: "POST" });
+    if (res.ok) {
+      const { publicKey } = await res.json();
+      setSettings((s) => ({ ...s, vapidPublicKey: publicKey }));
+      toast.success("VAPID keys generated");
+    } else {
+      toast.error("Failed to generate VAPID keys");
+    }
+    setGeneratingVapid(false);
+  }
+
+  async function subscribeToPush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      toast.error("Web push is not supported in this browser");
+      return;
+    }
+    const vapidRes = await fetch("/api/push/vapid");
+    const { publicKey } = await vapidRes.json();
+    if (!publicKey) {
+      toast.error("Generate VAPID keys first");
+      return;
+    }
+
+    setPushLoading(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        toast.error("Notification permission denied");
+        return;
+      }
+
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+
+      const json = sub.toJSON();
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+      });
+      setPushSubscribed(true);
+      toast.success("Web push notifications enabled");
+    } catch {
+      toast.error("Failed to enable push notifications");
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  async function unsubscribeFromPush() {
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+      const sub = await reg?.pushManager.getSubscription();
+      if (sub) {
+        await fetch("/api/push/subscribe", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
+        await sub.unsubscribe();
+      }
+      setPushSubscribed(false);
+      toast.success("Web push notifications disabled");
+    } catch {
+      toast.error("Failed to disable push notifications");
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+  }
+
   // Monica import state
   const [monicaDomain, setMonicaDomain] = useState("");
   const [monicaToken, setMonicaToken] = useState("");
@@ -218,26 +315,47 @@ export default function SettingsClient({
                 Global defaults — individual contacts and events can override these.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Days before event to notify</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={settings.reminderDaysBefore ?? 7}
-                  onChange={(e) => set("reminderDaysBefore", parseInt(e.target.value) || 7)}
-                />
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Days before event to notify</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={settings.reminderDaysBefore ?? 7}
+                    onChange={(e) => set("reminderDaysBefore", parseInt(e.target.value) || 7)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Days without contact (stale threshold)</Label>
+                  <Input
+                    type="number"
+                    min={7}
+                    max={365}
+                    value={settings.staleDays ?? 90}
+                    onChange={(e) => set("staleDays", parseInt(e.target.value) || 90)}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Days without contact (stale threshold)</Label>
-                <Input
-                  type="number"
-                  min={7}
-                  max={365}
-                  value={settings.staleDays ?? 90}
-                  onChange={(e) => set("staleDays", parseInt(e.target.value) || 90)}
-                />
+                <Label>Date format</Label>
+                <Select
+                  value={settings.dateFormat ?? "MMM d, yyyy"}
+                  onValueChange={(v) => set("dateFormat", v ?? "MMM d, yyyy")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MMM d, yyyy">Apr 8, 2026 (MMM d, yyyy)</SelectItem>
+                    <SelectItem value="MM/dd/yyyy">04/08/2026 (MM/dd/yyyy)</SelectItem>
+                    <SelectItem value="dd/MM/yyyy">08/04/2026 (dd/MM/yyyy)</SelectItem>
+                    <SelectItem value="yyyy-MM-dd">2026-04-08 (yyyy-MM-dd)</SelectItem>
+                    <SelectItem value="d MMM yyyy">8 Apr 2026 (d MMM yyyy)</SelectItem>
+                    <SelectItem value="MMMM d, yyyy">April 8, 2026 (MMMM d, yyyy)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
@@ -345,6 +463,45 @@ export default function SettingsClient({
               <CardDescription>Receive daily digests via email</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Provider quick-setup</Label>
+                <Select
+                  value=""
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    const PRESETS: Record<string, { host: string; port: number; user?: string }> = {
+                      resend:    { host: "smtp.resend.com",              port: 587, user: "resend" },
+                      sendgrid:  { host: "smtp.sendgrid.net",            port: 587, user: "apikey" },
+                      mailgun:   { host: "smtp.mailgun.org",             port: 587 },
+                      postmark:  { host: "smtp.postmarkapp.com",         port: 587 },
+                      brevo:     { host: "smtp-relay.brevo.com",         port: 587 },
+                      ses:       { host: "email-smtp.us-east-1.amazonaws.com", port: 587 },
+                      smtp2go:   { host: "mail.smtp2go.com",             port: 587 },
+                      mandrill:  { host: "smtp.mandrillapp.com",         port: 587 },
+                    };
+                    const p = PRESETS[v];
+                    if (p) {
+                      set("smtpHost", p.host);
+                      set("smtpPort", p.port);
+                      if (p.user) set("smtpUser", p.user);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="— select to pre-fill host/port —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="resend">Resend</SelectItem>
+                    <SelectItem value="sendgrid">SendGrid</SelectItem>
+                    <SelectItem value="mailgun">Mailgun</SelectItem>
+                    <SelectItem value="postmark">Postmark</SelectItem>
+                    <SelectItem value="brevo">Brevo (Sendinblue)</SelectItem>
+                    <SelectItem value="ses">AWS SES (us-east-1)</SelectItem>
+                    <SelectItem value="smtp2go">SMTP2GO</SelectItem>
+                    <SelectItem value="mandrill">Mailchimp Transactional (Mandrill)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Host</Label>
@@ -359,7 +516,7 @@ export default function SettingsClient({
                   <Input value={settings.smtpUser ?? ""} onChange={(e) => set("smtpUser", e.target.value || null)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Password</Label>
+                  <Label>Password / API key</Label>
                   <Input type="password" value={settings.smtpPass ?? ""} onChange={(e) => set("smtpPass", e.target.value || null)} />
                 </div>
                 <div className="space-y-2">
@@ -371,6 +528,49 @@ export default function SettingsClient({
                   <Input placeholder="you@example.com" value={settings.smtpTo ?? ""} onChange={(e) => set("smtpTo", e.target.value || null)} />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Web push</CardTitle>
+              <CardDescription>
+                Receive push notifications directly in this browser. Requires HTTPS in production.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!settings.vapidPublicKey ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Generate VAPID keys once to enable web push. These are stored in your settings.
+                  </p>
+                  <Button variant="outline" onClick={generateVapidKeys} disabled={generatingVapid}>
+                    {generatingVapid ? "Generating…" : "Generate VAPID keys"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    VAPID keys configured
+                  </div>
+                  <div className="flex gap-2">
+                    {pushSubscribed ? (
+                      <Button variant="outline" onClick={unsubscribeFromPush} disabled={pushLoading}>
+                        {pushLoading ? "Disabling…" : "Disable on this browser"}
+                      </Button>
+                    ) : (
+                      <Button onClick={subscribeToPush} disabled={pushLoading}>
+                        {pushLoading ? "Enabling…" : "Enable on this browser"}
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={generateVapidKeys} disabled={generatingVapid} className="text-muted-foreground">
+                      <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                      Regenerate keys
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -417,12 +617,29 @@ export default function SettingsClient({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Username</Label>
-                  <Input readOnly value="magali" className="font-mono text-sm" />
+                  <div className="flex gap-2">
+                    <Input readOnly value="magali" className="font-mono text-sm" />
+                    <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText("magali"); toast.success("Copied"); }}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Password (DAV token)</Label>
                   <div className="flex gap-2">
-                    <Input readOnly value={settings.davToken ?? ""} type="password" className="font-mono text-sm" />
+                    <Input readOnly value={settings.davToken ?? ""} type={showDavToken ? "text" : "password"} className="font-mono text-sm" />
+                    <Button variant="outline" size="icon" onClick={() => setShowDavToken((v) => !v)} title={showDavToken ? "Hide token" : "Show token"}>
+                      {showDavToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => { if (settings.davToken) { navigator.clipboard.writeText(settings.davToken); toast.success("Copied"); } }}
+                      disabled={!settings.davToken}
+                      title="Copy token"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
                     <Button variant="outline" size="icon" onClick={regenerateDavToken} title="Regenerate token">
                       <RefreshCw className="h-4 w-4" />
                     </Button>
@@ -434,6 +651,42 @@ export default function SettingsClient({
                   Generate a DAV token to enable sync. Existing connections will need to be updated when you regenerate.
                 </p>
               )}
+              <Separator />
+              <div>
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-sm font-medium hover:underline"
+                  onClick={() => setShowMacSetup((v) => !v)}
+                >
+                  {showMacSetup ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  How to connect on macOS
+                </button>
+                {showMacSetup && (
+                  <div className="mt-3 rounded-md border bg-muted/30 p-4 text-sm space-y-3">
+                    <p className="font-medium">macOS System Settings → Internet Accounts</p>
+                    <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
+                      <li>Open <strong className="text-foreground">System Settings</strong> → <strong className="text-foreground">Internet Accounts</strong></li>
+                      <li>Click <strong className="text-foreground">Add Account…</strong> → choose <strong className="text-foreground">Other CalDAV Account</strong> (for calendar) or <strong className="text-foreground">Other CardDAV Account</strong> (for contacts)</li>
+                      <li>Set <strong className="text-foreground">Account Type</strong> to <strong className="text-foreground">Advanced</strong></li>
+                      <li>
+                        Fill in:
+                        <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
+                          <li><strong className="text-foreground">Username:</strong> magali</li>
+                          <li><strong className="text-foreground">Password:</strong> your DAV token (copy it above)</li>
+                          <li><strong className="text-foreground">Server Address:</strong> {origin}</li>
+                          <li><strong className="text-foreground">Server Path:</strong> /api/dav/caldav/ (or /api/dav/carddav/ for contacts)</li>
+                          <li><strong className="text-foreground">Port:</strong> 443 (or your port if self-hosted without HTTPS)</li>
+                          <li><strong className="text-foreground">Use SSL:</strong> checked (if using HTTPS)</li>
+                        </ul>
+                      </li>
+                      <li>Click <strong className="text-foreground">Sign In</strong></li>
+                    </ol>
+                    <p className="text-xs text-muted-foreground">
+                      Note: macOS Internet Accounts requires HTTPS. For local development, use a tool like Caddy or ngrok to expose the app over HTTPS.
+                    </p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

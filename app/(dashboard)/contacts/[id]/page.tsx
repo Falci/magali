@@ -3,6 +3,7 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { getDateFormat } from "@/lib/date-format";
 import { formatBirthday } from "@/lib/birthday";
 import type {
   ContactEmail, ContactPhone, ContactAddress, Interaction,
@@ -25,6 +26,7 @@ export default async function ContactDetailPage({
 }) {
   await requireSession();
   const { id } = await params;
+  const dateFormat = await getDateFormat();
 
   const contact = await prisma.contact.findUnique({
     where: { id },
@@ -151,6 +153,7 @@ export default async function ContactDetailPage({
         {/* Relationships */}
         <RelationshipsSection
           contactId={id}
+          contactName={contact.firstName}
           relationships={relationships}
           allContacts={allContacts}
         />
@@ -191,7 +194,7 @@ export default async function ContactDetailPage({
                   {scheduledInteractions.map((interaction) => (
                     <div key={interaction.id} className="flex gap-3 text-sm">
                       <div className="shrink-0 text-xs text-muted-foreground w-24 pt-0.5">
-                        {format(new Date(interaction.date), "MMM d, yyyy")}
+                        {format(new Date(interaction.date), dateFormat)}
                       </div>
                       <div>
                         <span className="font-medium capitalize">{interaction.type}</span>
@@ -207,7 +210,7 @@ export default async function ContactDetailPage({
               {pastInteractions.map((interaction) => (
                 <div key={interaction.id} className="flex gap-3 text-sm">
                   <div className="shrink-0 text-xs text-muted-foreground w-24 pt-0.5">
-                    {format(new Date(interaction.date), "MMM d, yyyy")}
+                    {format(new Date(interaction.date), dateFormat)}
                   </div>
                   <div>
                     <span className="font-medium capitalize">{interaction.type}</span>

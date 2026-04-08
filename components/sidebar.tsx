@@ -13,6 +13,7 @@ import {
   Calendar,
   Settings,
   LogOut,
+  Network,
 } from "lucide-react";
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/events", label: "Events", icon: CalendarDays },
   { href: "/calendar", label: "Calendar", icon: Calendar },
+  { href: "/graph", label: "Graph", icon: Network },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

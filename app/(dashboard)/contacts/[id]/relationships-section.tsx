@@ -13,13 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Trash2, Plus, Users, ExternalLink } from "lucide-react";
+import { Trash2, Plus, Users, ExternalLink, Pencil } from "lucide-react";
 import { ContactCombobox, type ContactOption } from "@/components/contacts/contact-combobox";
 
 const RELATIONSHIP_TYPES = [
   "friend", "family", "colleague", "partner", "spouse",
   "acquaintance", "mentor", "mentee",
   "child", "parent", "sibling",
+  "ex-spouse", "ex-partner",
   "other",
 ];
 
@@ -36,6 +37,7 @@ function deriveLabel(type: string, direction: "from" | "to", otherGender: string
     sibling: "sibling", brother: "sibling", sister: "sibling",
     mentor: "mentee", mentee: "mentor",
     spouse: "spouse", husband: "spouse", wife: "spouse",
+    "ex-spouse": "ex-spouse", "ex-partner": "ex-partner",
   };
   const GENDERED: Record<string, { male: string; female: string }> = {
     parent: { male: "father", female: "mother" },
@@ -73,12 +75,22 @@ function defaultNewContact(firstName = ""): NewContactForm {
   return { firstName, lastName: "", gender: "", birthdayMonth: "", birthdayDay: "", birthdayYear: "" };
 }
 
+// Returns the label for the CURRENT contact given a stored type and "from" direction
+function currentContactLabel(type: string): string {
+  // When creating, current contact is always FROM, and type means "FROM is type"
+  // e.g. type "child" → current contact is the child
+  // We just display the type as-is for the current contact
+  return type;
+}
+
 export default function RelationshipsSection({
   contactId,
+  contactName,
   relationships,
   allContacts,
 }: {
   contactId: string;
+  contactName: string;
   relationships: Relationship[];
   allContacts: OtherContact[];
 }) {
@@ -90,8 +102,18 @@ export default function RelationshipsSection({
   const [relType, setRelType] = useState("friend");
   const [loading, setLoading] = useState(false);
 
+  // Edit state
+  const [editingRel, setEditingRel] = useState<Relationship | null>(null);
+  const [editType, setEditType] = useState("friend");
+  const [editLoading, setEditLoading] = useState(false);
+
   const linked = relationships.map((r) => r.other.id);
   const available = allContacts.filter((c) => !linked.includes(c.id));
+
+  const selectedContact = allContacts.find((c) => c.id === selectedId);
+  const selectedName = selectedContact
+    ? `${selectedContact.firstName}${selectedContact.lastName ? ` ${selectedContact.lastName}` : ""}`
+    : null;
 
   function handleOpenChange(v: boolean) {
     setOpen(v);
@@ -181,10 +203,39 @@ export default function RelationshipsSection({
     }
   }
 
+  function openEdit(rel: Relationship) {
+    setEditingRel(rel);
+    setEditType(rel.type);
+  }
+
+  async function handleEditSave() {
+    if (!editingRel) return;
+    setEditLoading(true);
+    const res = await fetch(`/api/relationships/${editingRel.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: editType, notes: editingRel.notes }),
+    });
+    if (res.ok) {
+      toast.success("Relationship updated");
+      setEditingRel(null);
+      router.refresh();
+    } else {
+      toast.error("Failed to update relationship");
+    }
+    setEditLoading(false);
+  }
+
   const canAdd = mode === "existing" ? selectedId !== null : newContact.firstName.trim() !== "";
   const newContactSearchParams = newContact.firstName
     ? `?firstName=${encodeURIComponent(newContact.firstName)}${newContact.lastName ? `&lastName=${encodeURIComponent(newContact.lastName)}` : ""}`
     : "";
+
+  // Direction preview sentence for the add dialog
+  const directionPreview =
+    (selectedName || (mode === "new" && newContact.firstName.trim()))
+      ? `${contactName} is ${currentContactLabel(relType)} of ${selectedName ?? newContact.firstName.trim()}`
+      : null;
 
   return (
     <>
@@ -215,6 +266,14 @@ export default function RelationshipsSection({
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => openEdit(rel)}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-destructive"
                   onClick={() => handleDelete(rel.id)}
                 >
@@ -226,6 +285,7 @@ export default function RelationshipsSection({
         </CardContent>
       </Card>
 
+      {/* Add dialog */}
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -343,6 +403,9 @@ export default function RelationshipsSection({
                   ))}
                 </SelectContent>
               </Select>
+              {directionPreview && (
+                <p className="text-xs text-muted-foreground italic">{directionPreview}</p>
+              )}
             </div>
           </div>
 
@@ -350,6 +413,41 @@ export default function RelationshipsSection({
             <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
             <Button onClick={handleAdd} disabled={loading || !canAdd}>
               {loading ? "Adding…" : "Add relationship"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={editingRel !== null} onOpenChange={(v) => { if (!v) setEditingRel(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit relationship</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            {editingRel && (
+              <p className="text-sm text-muted-foreground">
+                Editing relationship with <span className="font-medium text-foreground">{editingRel.other.firstName} {editingRel.other.lastName}</span>
+              </p>
+            )}
+            <div className="space-y-1.5">
+              <Label>Relationship type</Label>
+              <Select value={editType} onValueChange={(v) => setEditType(v ?? editType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATIONSHIP_TYPES.map((t) => (
+                    <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingRel(null)}>Cancel</Button>
+            <Button onClick={handleEditSave} disabled={editLoading}>
+              {editLoading ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

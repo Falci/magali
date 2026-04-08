@@ -191,4 +191,15 @@ model Settings {
   davToken           String?
   staleDays          Int     @default(90)
   reminderDaysBefore Int     @default(7)
+  dateFormat         String  @default("MMM d, yyyy")
+  vapidPublicKey     String?
+  vapidPrivateKey    String?
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }

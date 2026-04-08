@@ -1,3 +1,4 @@
+import webpush from "web-push";
 import { prisma } from "@/lib/db";
 import { getUpcomingEvents, getStaleContacts, getScheduledInteractions } from "@/lib/events";
 import { sendTelegram } from "./telegram";
@@ -87,5 +88,29 @@ export async function runNotifications() {
       "🍉 Magali daily digest",
       plainText
     );
+  }
+
+  // Web push
+  if (settings.vapidPublicKey && settings.vapidPrivateKey) {
+    const subscriptions = await prisma.pushSubscription.findMany();
+    if (subscriptions.length > 0) {
+      webpush.setVapidDetails(
+        "mailto:magali@localhost",
+        settings.vapidPublicKey,
+        settings.vapidPrivateKey
+      );
+      const payload = JSON.stringify({
+        title: "🍉 Magali daily digest",
+        body: lines.map((l) => l.replace(/<[^>]+>/g, "")).join("\n"),
+      });
+      await Promise.allSettled(
+        subscriptions.map((sub) =>
+          webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            payload
+          ).catch(() => null)
+        )
+      );
+    }
   }
 }
