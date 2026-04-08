@@ -56,13 +56,13 @@ async function fetchAllMonicaContacts(base: string, token: string): Promise<Moni
   return all;
 }
 
-async function fetchRelationships(base: string, token: string, contactId: number): Promise<MonicaRelationship[]> {
+async function fetchRelationships(base: string, token: string, contactId: number): Promise<{ rels: MonicaRelationship[]; error: string | null }> {
   const res = await fetch(`${base}/api/contacts/${contactId}/relationships`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
   });
-  if (!res.ok) return [];
+  if (!res.ok) return { rels: [], error: `HTTP ${res.status} for contact ${contactId}` };
   const json = await res.json();
-  return json.data ?? [];
+  return { rels: json.data ?? [], error: null };
 }
 
 function parseBirthday(b: MonicaBirthdate | null): { day: number | null; month: number | null; year: number | null } {
@@ -192,7 +192,12 @@ export async function POST(req: NextRequest) {
           relDone++;
           send({ type: "progress", current: relDone, total: monicaToLocal.size, phase: "relationships", name: "" });
 
-          const rels = await fetchRelationships(base, token, monicaId);
+          const { rels, error: fetchError } = await fetchRelationships(base, token, monicaId);
+          if (fetchError) {
+            errors.push(`[relationships] contact monica_id=${monicaId}: ${fetchError}`);
+            continue;
+          }
+
           for (const rel of rels) {
             let relatedLocalId = monicaToLocal.get(rel.of_contact.id);
             if (!relatedLocalId) {
@@ -206,7 +211,8 @@ export async function POST(req: NextRequest) {
                 });
                 monicaToLocal.set(rel.of_contact.id, stub.id);
                 relatedLocalId = stub.id;
-              } catch {
+              } catch (err: unknown) {
+                errors.push(`[stub] ${rel.of_contact.first_name} ${rel.of_contact.last_name ?? ""}: ${err instanceof Error ? err.message : String(err)}`);
                 relSkipped++;
                 continue;
               }
@@ -226,7 +232,8 @@ export async function POST(req: NextRequest) {
                 },
               });
               relImported++;
-            } catch {
+            } catch (err: unknown) {
+              errors.push(`[relationship] monica_id=${monicaId} → monica_id=${rel.of_contact.id} (${rel.relationship_type.name}): ${err instanceof Error ? err.message : String(err)}`);
               relSkipped++;
             }
           }
