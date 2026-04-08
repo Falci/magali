@@ -130,6 +130,22 @@ export default function SettingsClient({
     setTesting(false);
   }
 
+  // Email provider state
+  const [smtpProvider, setSmtpProvider] = useState<string>("");
+
+  const SMTP_PRESETS: Record<string, { host: string; port: number; user?: string; apiKeyOnly?: boolean; userLabel?: string; passLabel?: string }> = {
+    resend:    { host: "smtp.resend.com",                       port: 587, user: "resend",  apiKeyOnly: true,  passLabel: "API key" },
+    sendgrid:  { host: "smtp.sendgrid.net",                     port: 587, user: "apikey", apiKeyOnly: true,  passLabel: "API key" },
+    mailgun:   { host: "smtp.mailgun.org",                      port: 587, apiKeyOnly: false },
+    postmark:  { host: "smtp.postmarkapp.com",                  port: 587, apiKeyOnly: true,  passLabel: "Server API token" },
+    brevo:     { host: "smtp-relay.brevo.com",                  port: 587, apiKeyOnly: false },
+    ses:       { host: "email-smtp.us-east-1.amazonaws.com",    port: 587, apiKeyOnly: false },
+    smtp2go:   { host: "mail.smtp2go.com",                      port: 587, apiKeyOnly: false },
+    mandrill:  { host: "smtp.mandrillapp.com",                  port: 587, apiKeyOnly: false },
+  };
+
+  const currentPreset = smtpProvider ? SMTP_PRESETS[smtpProvider] : null;
+
   // DAV token visibility state
   const [showDavToken, setShowDavToken] = useState(false);
   const [showMacSetup, setShowMacSetup] = useState(false);
@@ -464,22 +480,13 @@ export default function SettingsClient({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Provider quick-setup</Label>
+                <Label>Email service</Label>
                 <Select
-                  value=""
+                  value={smtpProvider}
                   onValueChange={(v) => {
-                    if (!v) return;
-                    const PRESETS: Record<string, { host: string; port: number; user?: string }> = {
-                      resend:    { host: "smtp.resend.com",              port: 587, user: "resend" },
-                      sendgrid:  { host: "smtp.sendgrid.net",            port: 587, user: "apikey" },
-                      mailgun:   { host: "smtp.mailgun.org",             port: 587 },
-                      postmark:  { host: "smtp.postmarkapp.com",         port: 587 },
-                      brevo:     { host: "smtp-relay.brevo.com",         port: 587 },
-                      ses:       { host: "email-smtp.us-east-1.amazonaws.com", port: 587 },
-                      smtp2go:   { host: "mail.smtp2go.com",             port: 587 },
-                      mandrill:  { host: "smtp.mandrillapp.com",         port: 587 },
-                    };
-                    const p = PRESETS[v];
+                    const provider = v === "custom" ? "" : v;
+                    setSmtpProvider(provider);
+                    const p = provider ? SMTP_PRESETS[provider] : null;
                     if (p) {
                       set("smtpHost", p.host);
                       set("smtpPort", p.port);
@@ -488,7 +495,7 @@ export default function SettingsClient({
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="— select to pre-fill host/port —" />
+                    <SelectValue placeholder="— select a service —" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="resend">Resend</SelectItem>
@@ -499,24 +506,39 @@ export default function SettingsClient({
                     <SelectItem value="ses">AWS SES (us-east-1)</SelectItem>
                     <SelectItem value="smtp2go">SMTP2GO</SelectItem>
                     <SelectItem value="mandrill">Mailchimp Transactional (Mandrill)</SelectItem>
+                    <SelectItem value="custom">Custom SMTP</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Host</Label>
-                  <Input placeholder="smtp.example.com" value={settings.smtpHost ?? ""} onChange={(e) => set("smtpHost", e.target.value || null)} />
+
+              {/* Provider-specific condensed view */}
+              {currentPreset && (
+                <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                  Server: <span className="font-mono text-foreground">{currentPreset.host}:{currentPreset.port}</span>
+                  {currentPreset.user && <> · Username: <span className="font-mono text-foreground">{currentPreset.user}</span></>}
                 </div>
+              )}
+
+              <div className={`grid gap-4 ${!currentPreset || !currentPreset.apiKeyOnly ? "grid-cols-2" : "grid-cols-1"}`}>
+                {/* Show host/port/user only for custom or non-apiKeyOnly providers */}
+                {(!currentPreset || !currentPreset.apiKeyOnly) && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Host</Label>
+                      <Input placeholder="smtp.example.com" value={settings.smtpHost ?? ""} onChange={(e) => set("smtpHost", e.target.value || null)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Port</Label>
+                      <Input type="number" placeholder="587" value={settings.smtpPort ?? ""} onChange={(e) => set("smtpPort", parseInt(e.target.value) || null)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Username</Label>
+                      <Input value={settings.smtpUser ?? ""} onChange={(e) => set("smtpUser", e.target.value || null)} />
+                    </div>
+                  </>
+                )}
                 <div className="space-y-2">
-                  <Label>Port</Label>
-                  <Input type="number" placeholder="587" value={settings.smtpPort ?? ""} onChange={(e) => set("smtpPort", parseInt(e.target.value) || null)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Username</Label>
-                  <Input value={settings.smtpUser ?? ""} onChange={(e) => set("smtpUser", e.target.value || null)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Password / API key</Label>
+                  <Label>{currentPreset?.passLabel ?? "Password / API key"}</Label>
                   <Input type="password" value={settings.smtpPass ?? ""} onChange={(e) => set("smtpPass", e.target.value || null)} />
                 </div>
                 <div className="space-y-2">
