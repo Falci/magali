@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Copy, Download, RefreshCw, Send } from "lucide-react";
+import { Copy, Download, RefreshCw, Send, X, Plus } from "lucide-react";
 
 type Settings = {
   telegramBotToken?: string | null;
@@ -25,11 +25,57 @@ type Settings = {
   reminderDaysBefore?: number | null;
 };
 
-export default function SettingsClient({ initialSettings }: { initialSettings: Settings | null }) {
+type FieldLabel = { id: string; field: string; label: string };
+
+export default function SettingsClient({
+  initialSettings,
+  fieldLabels: initialFieldLabels,
+}: {
+  initialSettings: Settings | null;
+  fieldLabels: FieldLabel[];
+}) {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>(initialSettings ?? {});
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+
+  // Field labels state
+  const [fieldLabels, setFieldLabels] = useState<FieldLabel[]>(initialFieldLabels);
+  const [newEmailLabel, setNewEmailLabel] = useState("");
+  const [newPhoneLabel, setNewPhoneLabel] = useState("");
+  const [newAddressLabel, setNewAddressLabel] = useState("");
+
+  async function addFieldLabel(field: string, label: string, clearFn: () => void) {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const res = await fetch("/api/field-labels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ field, label: trimmed }),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      setFieldLabels((prev) => [...prev, created]);
+      clearFn();
+    } else if (res.status === 409) {
+      toast.error("Label already exists");
+    } else {
+      toast.error("Failed to add label");
+    }
+  }
+
+  async function deleteFieldLabel(id: string) {
+    const res = await fetch(`/api/field-labels/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setFieldLabels((prev) => prev.filter((l) => l.id !== id));
+    } else {
+      toast.error("Failed to delete label");
+    }
+  }
+
+  function labelsByField(field: string) {
+    return fieldLabels.filter((l) => l.field === field);
+  }
 
   function set(field: keyof Settings, value: string | number | null) {
     setSettings((s) => ({ ...s, [field]: value }));
@@ -157,6 +203,7 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
       <Tabs defaultValue="general">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="field-types">Field types</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="dav">CalDAV / CardDAV</TabsTrigger>
           <TabsTrigger value="import">Import</TabsTrigger>
@@ -197,6 +244,66 @@ export default function SettingsClient({ initialSettings }: { initialSettings: S
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
+        </TabsContent>
+
+        {/* Field types */}
+        <TabsContent value="field-types" className="space-y-4 pt-2">
+          <p className="text-sm text-muted-foreground">
+            Manage the label options available for email, phone, and address fields when editing contacts.
+          </p>
+          {(["email", "phone", "address"] as const).map((field) => {
+            const labels = labelsByField(field);
+            const newLabel = field === "email" ? newEmailLabel : field === "phone" ? newPhoneLabel : newAddressLabel;
+            const setNewLabel = field === "email" ? setNewEmailLabel : field === "phone" ? setNewPhoneLabel : setNewAddressLabel;
+            const fieldTitle = field.charAt(0).toUpperCase() + field.slice(1);
+            return (
+              <Card key={field}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">{fieldTitle} labels</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {labels.map((l) => (
+                      <span
+                        key={l.id}
+                        className="inline-flex items-center gap-1 rounded-md border bg-muted px-2 py-1 text-xs"
+                      >
+                        {l.label}
+                        <button
+                          type="button"
+                          onClick={() => deleteFieldLabel(l.id)}
+                          className="text-muted-foreground hover:text-destructive"
+                          aria-label={`Remove ${l.label}`}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {labels.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No labels yet.</p>
+                    )}
+                  </div>
+                  <form
+                    className="flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      addFieldLabel(field, newLabel, () => setNewLabel(""));
+                    }}
+                  >
+                    <Input
+                      placeholder={`New ${field} label…`}
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <Button type="submit" size="sm" variant="outline" disabled={!newLabel.trim()}>
+                      <Plus className="size-3.5 mr-1" />Add
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            );
+          })}
         </TabsContent>
 
         {/* Notifications */}

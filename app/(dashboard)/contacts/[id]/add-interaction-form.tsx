@@ -14,8 +14,11 @@ export default function AddInteractionForm({ contactId }: { contactId: string })
   const router = useRouter();
   const [type, setType] = useState("call");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const isScheduled = date > new Date().toISOString().slice(0, 10);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,14 +26,14 @@ export default function AddInteractionForm({ contactId }: { contactId: string })
     const res = await fetch(`/api/contacts/${contactId}/interactions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, date, notes: notes.trim() || null }),
+      body: JSON.stringify({ type, date, time: time || null, notes: notes.trim() || null }),
     });
     if (res.ok) {
-      toast.success("Interaction logged");
+      toast.success(isScheduled ? "Interaction scheduled" : "Interaction logged");
       setNotes("");
       router.refresh();
     } else {
-      toast.error("Failed to log interaction");
+      toast.error("Failed to save interaction");
     }
     setLoading(false);
   }
@@ -49,6 +52,10 @@ export default function AddInteractionForm({ contactId }: { contactId: string })
           </SelectContent>
         </Select>
         <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+        <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-28" />
+        {isScheduled && (
+          <span className="self-center text-xs text-blue-600 font-medium">scheduled</span>
+        )}
       </div>
       <Textarea
         placeholder="Optional notes…"
@@ -57,7 +64,7 @@ export default function AddInteractionForm({ contactId }: { contactId: string })
         rows={2}
       />
       <Button type="submit" size="sm" disabled={loading}>
-        {loading ? "Logging…" : "Log interaction"}
+        {loading ? "Saving…" : isScheduled ? "Schedule interaction" : "Log interaction"}
       </Button>
     </form>
   );

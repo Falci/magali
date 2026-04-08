@@ -10,13 +10,14 @@ export async function POST(
   if (error) return error;
 
   const { id: contactId } = await params;
-  const { type, date, notes } = await req.json();
+  const { type, date, time, notes } = await req.json();
 
   const interaction = await prisma.interaction.create({
     data: {
       contactId,
       type,
       date: date ? new Date(date) : new Date(),
+      time: time ?? null,
       notes: notes ?? null,
     },
   });

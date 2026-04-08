@@ -35,8 +35,8 @@ export default async function ContactDetailPage({
       tags: { include: { tag: true } },
       interactions: { orderBy: { date: "desc" }, take: 20 },
       events: { orderBy: { date: "asc" } },
-      relationshipsFrom: { include: { to: true } },
-      relationshipsTo: { include: { from: true } },
+      relationshipsFrom: { include: { to: { select: { id: true, firstName: true, lastName: true, gender: true } } } },
+      relationshipsTo: { include: { from: { select: { id: true, firstName: true, lastName: true, gender: true } } } },
     },
   });
 
@@ -44,12 +44,15 @@ export default async function ContactDetailPage({
 
   const allContacts = await prisma.contact.findMany({
     where: { id: { not: id } },
-    select: { id: true, firstName: true, lastName: true },
+    select: { id: true, firstName: true, lastName: true, gender: true },
     orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
   });
 
+  const now = new Date();
   const initials = `${contact.firstName[0] ?? ""}${contact.lastName?.[0] ?? ""}`.toUpperCase();
-  const lastInteraction = contact.interactions[0];
+  const scheduledInteractions = contact.interactions.filter((i) => new Date(i.date) > now);
+  const pastInteractions = contact.interactions.filter((i) => new Date(i.date) <= now);
+  const lastInteraction = pastInteractions[0];
   const relationships = [
     ...contact.relationshipsFrom.map((r) => ({ ...r, other: r.to, direction: "from" as const })),
     ...contact.relationshipsTo.map((r) => ({ ...r, other: r.from, direction: "to" as const })),
@@ -178,11 +181,30 @@ export default async function ContactDetailPage({
         <CardContent className="space-y-4">
           <AddInteractionForm contactId={id} />
           <Separator />
-          {contact.interactions.length === 0 ? (
+          {scheduledInteractions.length === 0 && pastInteractions.length === 0 ? (
             <p className="text-sm text-muted-foreground">No interactions logged yet.</p>
           ) : (
             <div className="space-y-3">
-              {contact.interactions.map((interaction) => (
+              {scheduledInteractions.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Scheduled</p>
+                  {scheduledInteractions.map((interaction) => (
+                    <div key={interaction.id} className="flex gap-3 text-sm">
+                      <div className="shrink-0 text-xs text-muted-foreground w-24 pt-0.5">
+                        {format(new Date(interaction.date), "MMM d, yyyy")}
+                      </div>
+                      <div>
+                        <span className="font-medium capitalize">{interaction.type}</span>
+                        {interaction.notes && (
+                          <p className="text-muted-foreground mt-0.5">{interaction.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {pastInteractions.length > 0 && <Separator />}
+                </>
+              )}
+              {pastInteractions.map((interaction) => (
                 <div key={interaction.id} className="flex gap-3 text-sm">
                   <div className="shrink-0 text-xs text-muted-foreground w-24 pt-0.5">
                     {format(new Date(interaction.date), "MMM d, yyyy")}

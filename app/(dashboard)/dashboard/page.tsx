@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { getUpcomingEvents, getStaleContacts } from "@/lib/events";
+import { getUpcomingEvents, getStaleContacts, getScheduledInteractions } from "@/lib/events";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,11 +18,14 @@ const EVENT_EMOJI: Record<string, string> = {
 
 export default async function DashboardPage() {
   const session = await requireSession();
-  const [upcomingEvents, staleContacts, totalContacts] = await Promise.all([
+  const [upcomingEvents, settings, totalContacts, scheduledInteractions] = await Promise.all([
     getUpcomingEvents(30),
-    getStaleContacts(90),
+    prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true } }),
     prisma.contact.count(),
+    getScheduledInteractions(),
   ]);
+  const globalStaleDays = settings?.staleDays ?? 90;
+  const staleContacts = await getStaleContacts(globalStaleDays);
 
   const firstName = session.user.name.split(" ")[0];
 
@@ -34,6 +37,32 @@ export default async function DashboardPage() {
           You have {totalContacts} contact{totalContacts !== 1 ? "s" : ""} in Magali.
         </p>
       </div>
+
+      {scheduledInteractions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-blue-600" />
+              Scheduled interactions <span className="text-muted-foreground font-normal">({scheduledInteractions.length})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {scheduledInteractions.slice(0, 5).map((i: import("@/lib/events").ScheduledInteraction) => (
+                <div key={i.id} className="flex items-center gap-3 text-sm">
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/contacts/${i.contactId}`} className="font-medium hover:underline truncate">{i.contactName}</Link>
+                    <p className="text-xs text-muted-foreground capitalize">{i.type}{i.notes ? ` — ${i.notes}` : ""}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs text-muted-foreground">{format(i.date, "MMM d")}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Upcoming events */}
@@ -86,7 +115,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-sm flex items-center gap-2">
               <Clock className="h-4 w-4" />
               People to reach out to
-              <span className="text-muted-foreground font-normal">(90+ days)</span>
+              <span className="text-muted-foreground font-normal">({globalStaleDays}+ days)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

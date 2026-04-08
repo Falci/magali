@@ -14,17 +14,7 @@ export default async function EditContactPage({
   await requireSession();
   const { id } = await params;
 
-  const DEFAULT_EMAIL_LABELS = ["home", "work", "other"];
-  const DEFAULT_PHONE_LABELS = ["mobile", "home", "work", "other"];
-  const DEFAULT_ADDRESS_LABELS = ["home", "work", "other"];
-
-  function mergeLabels(defaults: string[], existing: { label: string }[]) {
-    const set = new Set(defaults);
-    for (const { label } of existing) set.add(label);
-    return Array.from(set);
-  }
-
-  const [contact, allTags, emailLabels, phoneLabels, addressLabels, settings] = await Promise.all([
+  const [contact, allTags, fieldLabels, settings] = await Promise.all([
     prisma.contact.findUnique({
       where: { id },
       include: {
@@ -35,11 +25,27 @@ export default async function EditContactPage({
       },
     }),
     prisma.tag.findMany({ orderBy: { name: "asc" } }),
-    prisma.contactEmail.findMany({ select: { label: true }, distinct: ["label"] }),
-    prisma.contactPhone.findMany({ select: { label: true }, distinct: ["label"] }),
-    prisma.contactAddress.findMany({ select: { label: true }, distinct: ["label"] }),
+    prisma.fieldLabel.findMany({ orderBy: [{ field: "asc" }, { label: "asc" }] }),
     prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true } }),
   ]);
+
+  function groupLabels(rows: { field: string; label: string }[], contact: { emails: { label: string }[]; phones: { label: string }[]; addresses: { label: string }[] } | null) {
+    const email = new Set(["home", "work", "other"]);
+    const phone = new Set(["mobile", "home", "work", "other"]);
+    const address = new Set(["home", "work", "other"]);
+    for (const { field, label } of rows) {
+      if (field === "email") email.add(label);
+      else if (field === "phone") phone.add(label);
+      else if (field === "address") address.add(label);
+    }
+    // Also include any labels already used on this contact
+    for (const e of contact?.emails ?? []) email.add(e.label);
+    for (const p of contact?.phones ?? []) phone.add(p.label);
+    for (const a of contact?.addresses ?? []) address.add(a.label);
+    return { email: Array.from(email), phone: Array.from(phone), address: Array.from(address) };
+  }
+
+  const labels = groupLabels(fieldLabels, contact);
 
   if (!contact) notFound();
 
@@ -52,7 +58,7 @@ export default async function EditContactPage({
     birthdayMonth: contact.birthdayMonth ? String(contact.birthdayMonth) : "",
     birthdayDay: contact.birthdayDay ? String(contact.birthdayDay) : "",
     birthdayYear: contact.birthdayYear ? String(contact.birthdayYear) : "",
-    staleDays: contact.staleDays ? String(contact.staleDays) : "",
+    staleDays: contact.staleDays === 0 ? "0" : contact.staleDays ? String(contact.staleDays) : "",
     notes: contact.notes ?? "",
     emails: contact.emails.map((e: { label: string; value: string }) => ({ label: e.label, value: e.value })),
     phones: contact.phones.map((p: { label: string; value: string }) => ({ label: p.label, value: p.value })),
@@ -81,9 +87,9 @@ export default async function EditContactPage({
         initialData={initialData}
         contactId={id}
         allTags={allTags}
-        emailLabels={mergeLabels(DEFAULT_EMAIL_LABELS, emailLabels)}
-        phoneLabels={mergeLabels(DEFAULT_PHONE_LABELS, phoneLabels)}
-        addressLabels={mergeLabels(DEFAULT_ADDRESS_LABELS, addressLabels)}
+        emailLabels={labels.email}
+        phoneLabels={labels.phone}
+        addressLabels={labels.address}
         globalStaleDays={settings?.staleDays ?? 90}
       />
     </div>

@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, X } from "lucide-react";
 import { LabelCombobox } from "@/components/contacts/label-combobox";
+import { Switch } from "@/components/ui/switch";
 
 type MultiField = { label: string; value: string };
 type Tag = { id: string; name: string; color: string | null };
@@ -22,6 +23,7 @@ type ContactFormData = {
   nickname: string;
   company: string;
   jobTitle: string;
+  gender: string;        // "male" | "female" | "other" | ""
   birthdayMonth: string; // "1"–"12" or ""
   birthdayDay: string;   // "1"–"31" or ""
   birthdayYear: string;  // 4-digit year or ""
@@ -46,6 +48,7 @@ const defaultForm = (): ContactFormData => ({
   nickname: "",
   company: "",
   jobTitle: "",
+  gender: "",
   birthdayMonth: "",
   birthdayDay: "",
   birthdayYear: "",
@@ -141,7 +144,7 @@ export default function ContactForm({
         birthdayMonth: form.birthdayMonth ? parseInt(form.birthdayMonth) : null,
         birthdayDay: form.birthdayDay ? parseInt(form.birthdayDay) : null,
         birthdayYear: form.birthdayYear ? parseInt(form.birthdayYear) : null,
-        staleDays: form.staleDays ? parseInt(form.staleDays) : null,
+        staleDays: form.staleDays === "0" ? 0 : form.staleDays ? parseInt(form.staleDays) : null,
         emails: form.emails.filter((e) => e.value.trim()),
         phones: form.phones.filter((p) => p.value.trim()),
         addresses: form.addresses.filter((a) => a.street || a.city || a.country),
@@ -185,13 +188,25 @@ export default function ContactForm({
             <Label htmlFor="jobTitle">Job title</Label>
             <Input id="jobTitle" value={form.jobTitle} onChange={(e) => set("jobTitle", e.target.value)} />
           </div>
+          <div className="space-y-2">
+            <Label>Gender</Label>
+            <Select value={form.gender} onValueChange={(v) => set("gender", v ?? "")}>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Not specified" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Not specified</SelectItem>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Birthday — three independent optional selects */}
           <div className="space-y-2 col-span-2">
             <Label>Birthday <span className="text-muted-foreground font-normal text-xs">(all fields optional)</span></Label>
             <div className="grid grid-cols-3 gap-2">
               <Select value={form.birthdayMonth} onValueChange={(v) => set("birthdayMonth", v ?? "")}>
-                <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Month" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">— Month —</SelectItem>
                   {MONTHS.map((m, i) => (
@@ -200,7 +215,7 @@ export default function ContactForm({
                 </SelectContent>
               </Select>
               <Select value={form.birthdayDay} onValueChange={(v) => set("birthdayDay", v ?? "")}>
-                <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Day" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">— Day —</SelectItem>
                   {DAYS.map((d) => (
@@ -228,15 +243,26 @@ export default function ContactForm({
           </div>
 
           <div className="space-y-2 col-span-2">
-            <Label>Stale contact reminder <span className="text-muted-foreground font-normal text-xs">(days without contact — leave blank for global default)</span></Label>
-            <Input
-              type="number"
-              min={1}
-              max={3650}
-              placeholder={`Use global default: ${globalStaleDays} days`}
-              value={form.staleDays}
-              onChange={(e) => set("staleDays", e.target.value)}
-            />
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.staleDays !== "0"}
+                onCheckedChange={(enabled) => set("staleDays", enabled ? "" : "0")}
+                id="staleEnabled"
+              />
+              <Label htmlFor="staleEnabled" className="font-normal cursor-pointer">
+                Stale contact reminder
+              </Label>
+            </div>
+            {form.staleDays !== "0" && (
+              <Input
+                type="number"
+                min={1}
+                max={3650}
+                placeholder={`Use global default: ${globalStaleDays} days`}
+                value={form.staleDays}
+                onChange={(e) => set("staleDays", e.target.value)}
+              />
+            )}
           </div>
         </CardContent>
       </Card>

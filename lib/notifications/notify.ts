@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getUpcomingEvents, getStaleContacts } from "@/lib/events";
+import { getUpcomingEvents, getStaleContacts, getScheduledInteractions } from "@/lib/events";
 import { sendTelegram } from "./telegram";
 import { sendEmail } from "./email";
 import { format } from "date-fns";
@@ -13,9 +13,10 @@ export async function runNotifications() {
 
   // Fetch a wide window and filter per-event below
   const maxWindow = Math.max(globalReminderDays, 30);
-  const [allEvents, allStale] = await Promise.all([
+  const [allEvents, allStale, scheduledInteractions] = await Promise.all([
     getUpcomingEvents(maxWindow),
     getStaleContacts(globalStaleDays),
+    getScheduledInteractions(),
   ]);
 
   const lines: string[] = [];
@@ -32,6 +33,14 @@ export async function runNotifications() {
     }
   }
 
+  // Scheduled interactions: notify on the day
+  const today = format(new Date(), "yyyy-MM-dd");
+  for (const i of scheduledInteractions) {
+    if (format(i.date, "yyyy-MM-dd") === today) {
+      lines.push(`📆 Scheduled <b>${i.type}</b> with <b>${i.contactName}</b> — Today${i.notes ? `: ${i.notes}` : ""}`);
+    }
+  }
+
   // Stale contacts: respect per-contact staleDays override
   const contacts = await prisma.contact.findMany({
     select: {
@@ -42,6 +51,7 @@ export async function runNotifications() {
 
   const now = Date.now();
   const staleToNotify = contacts.filter((c) => {
+    if (c.staleDays === 0) return false; // disabled
     const threshold = (c.staleDays ?? globalStaleDays) * 86400000;
     const last = c.interactions[0]?.date;
     return !last || now - new Date(last).getTime() >= threshold;

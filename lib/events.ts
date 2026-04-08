@@ -92,9 +92,34 @@ export async function getUpcomingEvents(days = 30): Promise<UpcomingEvent[]> {
   return upcoming;
 }
 
-export async function getStaleContacts(staleDays = 90) {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - staleDays);
+export type ScheduledInteraction = {
+  id: string;
+  date: Date;
+  type: string;
+  notes: string | null;
+  contactId: string;
+  contactName: string;
+};
+
+export async function getScheduledInteractions(): Promise<ScheduledInteraction[]> {
+  const now = new Date();
+  const interactions = await prisma.interaction.findMany({
+    where: { date: { gt: now } },
+    include: { contact: { select: { id: true, firstName: true, lastName: true } } },
+    orderBy: { date: "asc" },
+  });
+  return interactions.map((i) => ({
+    id: i.id,
+    date: i.date,
+    type: i.type,
+    notes: i.notes,
+    contactId: i.contact.id,
+    contactName: `${i.contact.firstName} ${i.contact.lastName ?? ""}`.trim(),
+  }));
+}
+
+export async function getStaleContacts(globalStaleDays = 90) {
+  const now = new Date();
 
   const contacts = await prisma.contact.findMany({
     select: {
@@ -102,6 +127,7 @@ export async function getStaleContacts(staleDays = 90) {
       firstName: true,
       lastName: true,
       photo: true,
+      staleDays: true,
       interactions: {
         orderBy: { date: "desc" },
         take: 1,
@@ -112,8 +138,10 @@ export async function getStaleContacts(staleDays = 90) {
 
   return contacts
     .filter((c) => {
+      if (c.staleDays === 0) return false; // disabled
+      const threshold = (c.staleDays ?? globalStaleDays) * 86400000;
       const last = c.interactions[0]?.date;
-      return !last || new Date(last) < cutoff;
+      return !last || now.getTime() - new Date(last).getTime() >= threshold;
     })
     .map((c) => ({
       id: c.id,

@@ -70,6 +70,7 @@ model Contact {
   birthdayMonth Int?     // 1–12
   birthdayYear  Int?
   staleDays     Int?     // null = use global default from Settings
+  gender        String?  // "male" | "female" | "other" | null
   notes         String?
   photo     String?
   company   String?
@@ -132,6 +133,7 @@ model Interaction {
   contactId String
   contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
   date      DateTime @default(now())
+  time      String?  // "HH:MM" — optional wall-clock time for calendar display
   type      String
   notes     String?
   createdAt DateTime @default(now())
@@ -166,6 +168,14 @@ model ContactTag {
   tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([contactId, tagId])
+}
+
+model FieldLabel {
+  id    String @id @default(cuid())
+  field String  // "email" | "phone" | "address"
+  label String
+
+  @@unique([field, label])
 }
 
 model Settings {
