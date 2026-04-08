@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, X } from "lucide-react";
+import { LabelCombobox } from "@/components/contacts/label-combobox";
 
 type MultiField = { label: string; value: string };
 type Tag = { id: string; name: string; color: string | null };
@@ -31,10 +32,6 @@ type ContactFormData = {
   addresses: { label: string; street: string; city: string; state: string; zip: string; country: string }[];
   tagIds: string[];
 };
-
-const EMAIL_LABELS = ["home", "work", "other"];
-const PHONE_LABELS = ["mobile", "home", "work", "other"];
-const ADDRESS_LABELS = ["home", "work", "other"];
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -64,10 +61,18 @@ export default function ContactForm({
   initialData,
   contactId,
   allTags,
+  emailLabels = ["home", "work", "other"],
+  phoneLabels = ["mobile", "home", "work", "other"],
+  addressLabels = ["home", "work", "other"],
+  globalStaleDays = 90,
 }: {
   initialData?: Partial<ContactFormData>;
   contactId?: string;
   allTags: Tag[];
+  emailLabels?: string[];
+  phoneLabels?: string[];
+  addressLabels?: string[];
+  globalStaleDays?: number;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -228,7 +233,7 @@ export default function ContactForm({
               type="number"
               min={1}
               max={3650}
-              placeholder="Use global default"
+              placeholder={`Use global default: ${globalStaleDays} days`}
               value={form.staleDays}
               onChange={(e) => set("staleDays", e.target.value)}
             />
@@ -248,10 +253,11 @@ export default function ContactForm({
           {form.emails.length === 0 && <p className="text-sm text-muted-foreground">No emails added.</p>}
           {form.emails.map((email, i) => (
             <div key={i} className="flex gap-2">
-              <Select value={email.label} onValueChange={(v) => updateEmail(i, "label", v ?? email.label)}>
-                <SelectTrigger className="w-28 shrink-0"><SelectValue /></SelectTrigger>
-                <SelectContent>{EMAIL_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
-              </Select>
+              <LabelCombobox
+                value={email.label}
+                onChange={(v) => updateEmail(i, "label", v)}
+                suggestions={emailLabels}
+              />
               <Input placeholder="email@example.com" value={email.value} onChange={(e) => updateEmail(i, "value", e.target.value)} className="flex-1" />
               <Button type="button" variant="ghost" size="icon" onClick={() => removeEmail(i)}><Trash2 className="h-4 w-4" /></Button>
             </div>
@@ -271,10 +277,11 @@ export default function ContactForm({
           {form.phones.length === 0 && <p className="text-sm text-muted-foreground">No phones added.</p>}
           {form.phones.map((phone, i) => (
             <div key={i} className="flex gap-2">
-              <Select value={phone.label} onValueChange={(v) => updatePhone(i, "label", v ?? phone.label)}>
-                <SelectTrigger className="w-28 shrink-0"><SelectValue /></SelectTrigger>
-                <SelectContent>{PHONE_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
-              </Select>
+              <LabelCombobox
+                value={phone.label}
+                onChange={(v) => updatePhone(i, "label", v)}
+                suggestions={phoneLabels}
+              />
               <Input placeholder="+1 555 000 0000" value={phone.value} onChange={(e) => updatePhone(i, "value", e.target.value)} className="flex-1" />
               <Button type="button" variant="ghost" size="icon" onClick={() => removePhone(i)}><Trash2 className="h-4 w-4" /></Button>
             </div>
@@ -297,10 +304,11 @@ export default function ContactForm({
               <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => removeAddress(i)}>
                 <Trash2 className="h-3 w-3" />
               </Button>
-              <Select value={addr.label} onValueChange={(v) => updateAddress(i, "label", v ?? addr.label)}>
-                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                <SelectContent>{ADDRESS_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
-              </Select>
+              <LabelCombobox
+                value={addr.label}
+                onChange={(v) => updateAddress(i, "label", v)}
+                suggestions={addressLabels}
+              />
               <Input placeholder="Street" value={addr.street} onChange={(e) => updateAddress(i, "street", e.target.value)} />
               <div className="grid grid-cols-2 gap-2">
                 <Input placeholder="City" value={addr.city} onChange={(e) => updateAddress(i, "city", e.target.value)} />

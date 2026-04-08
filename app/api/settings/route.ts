@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireApiSession } from "@/lib/api-auth";
 import { randomBytes } from "crypto";
@@ -25,6 +26,7 @@ export async function PUT(req: NextRequest) {
     update: data,
   });
 
+  revalidatePath("/", "layout");
   return NextResponse.json(settings);
 }
 
