@@ -194,8 +194,23 @@ export async function POST(req: NextRequest) {
 
           const rels = await fetchRelationships(base, token, monicaId);
           for (const rel of rels) {
-            const relatedLocalId = monicaToLocal.get(rel.of_contact.id);
-            if (!relatedLocalId) { relSkipped++; continue; } // related contact was partial / not imported
+            let relatedLocalId = monicaToLocal.get(rel.of_contact.id);
+            if (!relatedLocalId) {
+              // Related contact is partial or failed to import — create a minimal stub
+              try {
+                const stub = await prisma.contact.create({
+                  data: {
+                    firstName: rel.of_contact.first_name,
+                    lastName: rel.of_contact.last_name ?? null,
+                  },
+                });
+                monicaToLocal.set(rel.of_contact.id, stub.id);
+                relatedLocalId = stub.id;
+              } catch {
+                relSkipped++;
+                continue;
+              }
+            }
 
             // Deduplicate: skip if we've already created this pair (either direction)
             const pairKey = [localId, relatedLocalId].sort().join(":");
