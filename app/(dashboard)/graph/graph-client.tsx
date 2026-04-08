@@ -5,13 +5,20 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { X } from "lucide-react";
+import { X, Eye, EyeOff } from "lucide-react";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
-type Contact = { id: string; firstName: string; lastName: string | null; staleDays: number | null };
+type Contact = {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  staleDays: number | null;
+  companyId: string | null;
+  tags: { tagId: string }[];
+};
 type Relationship = { id: string; fromId: string; toId: string; type: string };
+type Tag = { id: string; name: string; color: string | null };
 
 const RELATIONSHIP_COLORS: Record<string, string> = {
   friend:       "#6366f1",
@@ -28,6 +35,7 @@ const RELATIONSHIP_COLORS: Record<string, string> = {
   "ex-spouse":  "#ef4444",
   "ex-partner": "#ef4444",
   other:        "#94a3b8",
+  company:      "#8b5cf6",
 };
 
 function getColor(type: string) {
@@ -40,12 +48,16 @@ type GraphLink = { source: string; target: string; type: string };
 export default function GraphClient({
   contacts,
   relationships,
+  tags,
 }: {
   contacts: Contact[];
   relationships: Relationship[];
+  tags: Tag[];
 }) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<{ x: number; y: number; node: GraphNode } | null>(null);
+  const [tooltipVisible, setTooltipVisible] = useState<{ x: number; y: number; node: GraphNode } | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
@@ -71,7 +83,9 @@ export default function GraphClient({
 
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
   const [highlightedType, setHighlightedType] = useState<string | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const [hideOrphans, setHideOrphans] = useState(false);
+  const [showCompanyEdges, setShowCompanyEdges] = useState(false);
+  const [activeTagId, setActiveTagId] = useState<string | null>(null);
 
   function toggleType(type: string) {
     setHiddenTypes((prev) => {
@@ -82,23 +96,62 @@ export default function GraphClient({
     });
   }
 
+  // Build company edges: contacts at the same company get linked
+  const companyLinks = useMemo((): GraphLink[] => {
+    if (!showCompanyEdges) return [];
+    const byCompany = new Map<string, string[]>();
+    for (const c of contacts) {
+      if (c.companyId) {
+        const group = byCompany.get(c.companyId) ?? [];
+        group.push(c.id);
+        byCompany.set(c.companyId, group);
+      }
+    }
+    const links: GraphLink[] = [];
+    for (const group of byCompany.values()) {
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          links.push({ source: group[i], target: group[j], type: "company" });
+        }
+      }
+    }
+    return links;
+  }, [contacts, showCompanyEdges]);
+
+  // Filter contacts by active tag
+  const visibleContactIds = useMemo(() => {
+    if (!activeTagId) return null; // null means all
+    return new Set(contacts.filter((c) => c.tags.some((t) => t.tagId === activeTagId)).map((c) => c.id));
+  }, [contacts, activeTagId]);
+
   const graphData = useMemo(() => {
-    const visibleRels = relationships.filter((r) => !hiddenTypes.has(r.type));
-    // Only include nodes that participate in visible relationships
-    const activeIds = new Set(visibleRels.flatMap((r) => [r.fromId, r.toId]));
-    // Always include all nodes so isolated contacts are visible
-    const nodes: GraphNode[] = contacts.map((c) => ({
+    const visibleRels: GraphLink[] = [
+      ...relationships.filter((r) => !hiddenTypes.has(r.type)).map((r) => ({ source: r.fromId, target: r.toId, type: r.type })),
+      ...companyLinks,
+    ];
+
+    // Apply tag filter to relationships
+    const filteredRels = visibleContactIds
+      ? visibleRels.filter((r) => visibleContactIds.has(r.source) && visibleContactIds.has(r.target))
+      : visibleRels;
+
+    const activeIds = new Set(filteredRels.flatMap((r) => [r.source, r.target]));
+
+    const filteredContacts = visibleContactIds
+      ? contacts.filter((c) => visibleContactIds.has(c.id))
+      : contacts;
+
+    const nodes: GraphNode[] = (hideOrphans
+      ? filteredContacts.filter((c) => activeIds.has(c.id))
+      : filteredContacts
+    ).map((c) => ({
       id: c.id,
       name: `${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`,
       staleDays: c.staleDays,
     }));
-    const links: GraphLink[] = visibleRels.map((r) => ({
-      source: r.fromId,
-      target: r.toId,
-      type: r.type,
-    }));
-    return { nodes, links, activeIds };
-  }, [contacts, relationships, hiddenTypes]);
+
+    return { nodes, links: filteredRels, activeIds };
+  }, [contacts, relationships, hiddenTypes, hideOrphans, visibleContactIds, companyLinks]);
 
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
@@ -118,7 +171,6 @@ export default function GraphClient({
       const isActive = graphData.activeIds.has(node.id);
       const isDeprioritized = node.staleDays === 0;
 
-      // Node circle
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 2 * Math.PI);
       ctx.fillStyle = isDeprioritized ? "#cbd5e1" : isActive ? "#6366f1" : "#94a3b8";
@@ -127,7 +179,6 @@ export default function GraphClient({
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Label
       ctx.font = `${fontSize}px sans-serif`;
       ctx.fillStyle = "rgba(0,0,0,0.8)";
       ctx.textAlign = "center";
@@ -153,18 +204,39 @@ export default function GraphClient({
     [highlightedType]
   );
 
+  // Use a ref + requestAnimationFrame to avoid re-renders on hover
+  const handleNodeHover = useCallback((node: (GraphNode & { x?: number; y?: number }) | null) => {
+    if (!node) {
+      tooltipRef.current = null;
+      setTooltipVisible(null);
+      return;
+    }
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    tooltipRef.current = { x: (node.x ?? 0), y: (node.y ?? 0), node };
+    setTooltipVisible({ x: (node.x ?? 0), y: (node.y ?? 0), node });
+  }, []);
+
+  const orphanCount = useMemo(() => {
+    const activeIds = graphData.activeIds;
+    const filtered = visibleContactIds
+      ? contacts.filter((c) => visibleContactIds.has(c.id))
+      : contacts;
+    return filtered.filter((c) => !activeIds.has(c.id)).length;
+  }, [contacts, graphData.activeIds, visibleContactIds]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
         <h1 className="text-xl font-semibold">Relationship graph</h1>
         <p className="text-sm text-muted-foreground">
-          {contacts.length} contacts · {relationships.length} relationships
+          {graphData.nodes.length} contacts · {graphData.links.length} edges
         </p>
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* Graph canvas */}
-        <div ref={containerRef} className="flex-1 bg-muted/20 overflow-hidden">
+        {/* Graph canvas — relative for tooltip overlay */}
+        <div ref={containerRef} className="flex-1 bg-muted/20 overflow-hidden relative">
           <ForceGraph2D
             graphData={{ nodes: graphData.nodes, links: graphData.links }}
             width={dimensions.width}
@@ -179,58 +251,121 @@ export default function GraphClient({
             linkColor={linkColor as never}
             linkWidth={linkWidth as never}
             onNodeClick={handleNodeClick as never}
-            onNodeHover={(node) => setHoveredNode(node as GraphNode | null)}
+            onNodeHover={handleNodeHover as never}
             nodeLabel=""
             linkDirectionalParticles={0}
             cooldownTicks={100}
           />
+
+          {/* Floating tooltip — positioned in graph canvas, not sidebar */}
+          {tooltipVisible && (
+            <div className="absolute top-3 left-3 pointer-events-none z-10">
+              <div className="rounded-md border bg-card/95 backdrop-blur-sm shadow-md px-3 py-2 text-sm">
+                <p className="font-medium">{tooltipVisible.node.name}</p>
+                {tooltipVisible.node.staleDays === 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Deprioritized</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-0.5">Click to open</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Side panel */}
-        <div className="w-56 border-l bg-card flex flex-col shrink-0 overflow-y-auto">
+        <div className="w-64 border-l bg-card flex flex-col shrink-0 overflow-y-auto">
+
+          {/* Relationship type filters */}
           <div className="p-3 border-b">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Filter by type</p>
-          </div>
-          <div className="p-3 space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Relationship types</p>
             {allTypes.length === 0 && (
               <p className="text-xs text-muted-foreground">No relationships yet.</p>
             )}
-            {allTypes.map((type) => {
-              const hidden = hiddenTypes.has(type);
-              const highlighted = highlightedType === type;
-              return (
-                <div key={type} className="flex items-center gap-2">
-                  <button
-                    className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded text-sm text-left transition-opacity ${hidden ? "opacity-40" : ""}`}
-                    onClick={() => toggleType(type)}
-                    title={hidden ? "Show" : "Hide"}
-                  >
-                    <span
-                      className="h-2.5 w-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: getColor(type) }}
-                    />
-                    <span className="capitalize truncate">{type}</span>
-                  </button>
-                  <button
-                    className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${highlighted ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted"}`}
-                    onClick={() => setHighlightedType(highlighted ? null : type)}
-                    title="Highlight"
-                  >
-                    {highlighted ? <X className="h-3 w-3" /> : "HL"}
-                  </button>
-                </div>
-              );
-            })}
+            <div className="space-y-1">
+              {allTypes.map((type) => {
+                const hidden = hiddenTypes.has(type);
+                const highlighted = highlightedType === type;
+                return (
+                  <div key={type} className="flex items-center gap-1.5">
+                    <button
+                      className={`flex flex-1 items-center gap-2 px-2 py-1 rounded text-sm text-left transition-opacity ${hidden ? "opacity-30" : ""}`}
+                      onClick={() => toggleType(type)}
+                      title={hidden ? "Show this type" : "Hide this type"}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: getColor(type) }}
+                      />
+                      <span className="capitalize truncate flex-1">{type}</span>
+                    </button>
+                    <button
+                      className={`text-xs px-1.5 py-0.5 rounded border shrink-0 transition-colors ${highlighted ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:bg-muted border-transparent"}`}
+                      onClick={() => setHighlightedType(highlighted ? null : type)}
+                      title={highlighted ? "Stop highlighting" : "Highlight only this type"}
+                    >
+                      {highlighted ? <X className="h-3 w-3" /> : "HL"}
+                    </button>
+                    <button
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => toggleType(type)}
+                      title={hidden ? "Show" : "Hide"}
+                    >
+                      {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {hoveredNode && (
-            <div className="mt-auto p-3 border-t">
-              <Card className="p-2">
-                <p className="text-xs font-medium">{hoveredNode.name}</p>
-                {hoveredNode.staleDays === 0 && (
-                  <p className="text-xs text-muted-foreground mt-0.5">Deprioritized</p>
+          {/* Display options */}
+          <div className="p-3 border-b space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Display</p>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideOrphans}
+                onChange={(e) => setHideOrphans(e.target.checked)}
+                className="rounded"
+              />
+              <span>Hide isolated contacts</span>
+              {orphanCount > 0 && <span className="text-xs text-muted-foreground">({orphanCount})</span>}
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showCompanyEdges}
+                onChange={(e) => setShowCompanyEdges(e.target.checked)}
+                className="rounded"
+              />
+              <span>Show company links</span>
+            </label>
+          </div>
+
+          {/* Tag filter */}
+          {tags.length > 0 && (
+            <div className="p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Filter by tag</p>
+              <div className="flex flex-wrap gap-1.5">
+                {activeTagId && (
+                  <button
+                    className="text-xs text-muted-foreground hover:text-foreground underline"
+                    onClick={() => setActiveTagId(null)}
+                  >
+                    Clear
+                  </button>
                 )}
-              </Card>
+                {tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant={activeTagId === tag.id ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    style={tag.color && activeTagId !== tag.id ? { borderColor: tag.color, color: tag.color } : {}}
+                    onClick={() => setActiveTagId(activeTagId === tag.id ? null : tag.id)}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
         </div>
