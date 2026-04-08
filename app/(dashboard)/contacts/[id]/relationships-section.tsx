@@ -107,6 +107,16 @@ export default function RelationshipsSection({
   const [editType, setEditType] = useState("friend");
   const [editLoading, setEditLoading] = useState(false);
 
+  const REVERSE: Record<string, string> = {
+    child: "parent", parent: "child",
+    son: "parent", daughter: "parent",
+    father: "child", mother: "child",
+    sibling: "sibling", brother: "sibling", sister: "sibling",
+    mentor: "mentee", mentee: "mentor",
+    spouse: "spouse", husband: "spouse", wife: "spouse",
+    "ex-spouse": "ex-spouse", "ex-partner": "ex-partner",
+  };
+
   const linked = relationships.map((r) => r.other.id);
   const available = allContacts.filter((c) => !linked.includes(c.id));
 
@@ -442,6 +452,11 @@ export default function RelationshipsSection({
                   ))}
                 </SelectContent>
               </Select>
+              {editingRel && (
+                <p className="text-xs text-muted-foreground italic">
+                  {contactName} is {editingRel.direction === "from" ? editType : (REVERSE[editType] ?? editType)} of {editingRel.other.firstName} {editingRel.other.lastName}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
