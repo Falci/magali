@@ -35,6 +35,7 @@ export default async function ContactDetailPage({
       phones: true,
       addresses: true,
       tags: { include: { tag: true } },
+      company: true,
       interactions: { orderBy: { date: "desc" }, take: 20 },
       events: { orderBy: { date: "asc" } },
       relationshipsFrom: { include: { to: { select: { id: true, firstName: true, lastName: true, gender: true } } } },
@@ -87,7 +88,7 @@ export default async function ContactDetailPage({
           {(contact.jobTitle || contact.company) && (
             <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
               <Briefcase className="h-3.5 w-3.5" />
-              {[contact.jobTitle, contact.company].filter(Boolean).join(" at ")}
+              {[contact.jobTitle, contact.company?.name].filter(Boolean).join(" at ")}
             </p>
           )}
           {contact.tags.length > 0 && (

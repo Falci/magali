@@ -96,12 +96,22 @@ export async function POST(req: NextRequest) {
               tagIds.push(tag.id);
             }
 
+            let importedCompanyId: string | undefined;
+            if (t.company?.trim()) {
+              const co = await prisma.company.upsert({
+                where: { name: t.company.trim() },
+                create: { name: t.company.trim() },
+                update: {},
+              });
+              importedCompanyId = co.id;
+            }
+
             const created = await prisma.contact.create({
               data: {
                 firstName: t.firstName,
                 lastName: t.lastName,
                 nickname: t.nickname,
-                company: t.company,
+                companyId: importedCompanyId,
                 jobTitle: t.jobTitle,
                 notes: t.notes,
                 birthdayDay: t.birthdayDay,

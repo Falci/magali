@@ -537,7 +537,7 @@ export default function SettingsClient({
                 <Select
                   value={smtpProvider}
                   onValueChange={(v) => {
-                    const provider = v === "custom" ? "" : v;
+                    const provider = v === "custom" ? "" : (v ?? "");
                     setSmtpProvider(provider);
                     const p = provider ? SMTP_PRESETS[provider] : null;
                     if (p) {

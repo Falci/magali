@@ -15,7 +15,7 @@ type Contact = {
   firstName: string;
   lastName: string | null;
   nickname: string | null;
-  company: string | null;
+  company: { id: string; name: string } | null;
   photo: string | null;
   staleDays: number | null;
   emails: { label: string; value: string }[];
@@ -46,7 +46,7 @@ export default function ContactsClient({
         c.firstName.toLowerCase().includes(lower) ||
         (c.lastName ?? "").toLowerCase().includes(lower) ||
         (c.nickname ?? "").toLowerCase().includes(lower) ||
-        (c.company ?? "").toLowerCase().includes(lower) ||
+        (c.company?.name ?? "").toLowerCase().includes(lower) ||
         c.emails.some((e) => e.value.toLowerCase().includes(lower));
 
       const matchesTag =
@@ -154,7 +154,7 @@ export default function ContactsClient({
                         )}
                       </p>
                       {contact.company && (
-                        <p className="text-sm text-muted-foreground truncate">{contact.company}</p>
+                        <p className="text-sm text-muted-foreground truncate">{contact.company.name}</p>
                       )}
                       {contact.emails[0] && (
                         <p className="text-xs text-muted-foreground truncate mt-0.5">{contact.emails[0].value}</p>

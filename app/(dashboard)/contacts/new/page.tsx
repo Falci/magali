@@ -21,10 +21,11 @@ export default async function NewContactPage({
 }) {
   await requireSession();
   const { firstName, lastName } = await searchParams;
-  const [allTags, fieldLabels, settings] = await Promise.all([
+  const [allTags, fieldLabels, settings, allCompanies] = await Promise.all([
     prisma.tag.findMany({ orderBy: { name: "asc" } }),
     prisma.fieldLabel.findMany({ orderBy: [{ field: "asc" }, { label: "asc" }] }),
     prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true } }),
+    prisma.company.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const labels = groupLabels(fieldLabels);
@@ -37,6 +38,7 @@ export default async function NewContactPage({
       </div>
       <ContactForm
         allTags={allTags}
+        allCompanies={allCompanies}
         emailLabels={labels.email}
         phoneLabels={labels.phone}
         addressLabels={labels.address}

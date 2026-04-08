@@ -14,7 +14,7 @@ export default async function EditContactPage({
   await requireSession();
   const { id } = await params;
 
-  const [contact, allTags, fieldLabels, settings] = await Promise.all([
+  const [contact, allTags, fieldLabels, settings, allCompanies] = await Promise.all([
     prisma.contact.findUnique({
       where: { id },
       include: {
@@ -22,11 +22,13 @@ export default async function EditContactPage({
         phones: true,
         addresses: true,
         tags: { include: { tag: true } },
+        company: true,
       },
     }),
     prisma.tag.findMany({ orderBy: { name: "asc" } }),
     prisma.fieldLabel.findMany({ orderBy: [{ field: "asc" }, { label: "asc" }] }),
     prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true } }),
+    prisma.company.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   function groupLabels(rows: { field: string; label: string }[], contact: { emails: { label: string }[]; phones: { label: string }[]; addresses: { label: string }[] } | null) {
@@ -53,7 +55,8 @@ export default async function EditContactPage({
     firstName: contact.firstName,
     lastName: contact.lastName ?? "",
     nickname: contact.nickname ?? "",
-    company: contact.company ?? "",
+    companyId: contact.companyId ?? "",
+    companyName: contact.company?.name ?? "",
     jobTitle: contact.jobTitle ?? "",
     birthdayMonth: contact.birthdayMonth ? String(contact.birthdayMonth) : "",
     birthdayDay: contact.birthdayDay ? String(contact.birthdayDay) : "",
@@ -87,6 +90,7 @@ export default async function EditContactPage({
         initialData={initialData}
         contactId={id}
         allTags={allTags}
+        allCompanies={allCompanies}
         emailLabels={labels.email}
         phoneLabels={labels.phone}
         addressLabels={labels.address}
