@@ -78,12 +78,21 @@ export default async function ContactDetailPage({
           )}
         </Avatar>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-semibold">
-            {contact.firstName} {contact.lastName}
-            {contact.nickname && (
-              <span className="text-muted-foreground text-lg font-normal ml-2">"{contact.nickname}"</span>
-            )}
-          </h1>
+          <div className="flex items-start justify-between gap-2">
+            <h1 className="text-2xl font-semibold leading-tight">
+              {contact.firstName} {contact.lastName}
+              {contact.nickname && (
+                <span className="text-muted-foreground text-lg font-normal ml-2">"{contact.nickname}"</span>
+              )}
+            </h1>
+            <div className="flex gap-2 shrink-0">
+              <Button variant="outline" size="sm" render={<Link href={`/contacts/${id}/edit`} />}>
+                <Edit className="h-4 w-4" />
+                <span className="hidden sm:inline ml-1">Edit</span>
+              </Button>
+              <DeleteContactButton contactId={id} />
+            </div>
+          </div>
           {contact.jobTitle && (
             <p className="text-muted-foreground text-sm mt-0.5">{contact.jobTitle}</p>
           )}
@@ -94,12 +103,6 @@ export default async function ContactDetailPage({
               ))}
             </div>
           )}
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" render={<Link href={`/contacts/${id}/edit`} />}>
-            <Edit className="h-4 w-4 mr-1" />Edit
-          </Button>
-          <DeleteContactButton contactId={id} />
         </div>
       </div>
 
