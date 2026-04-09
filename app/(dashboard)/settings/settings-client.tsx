@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, Download, RefreshCw, Send, X, Plus, Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
+import { Copy, Download, RefreshCw, Send, X, Plus, Eye, EyeOff, ChevronDown, ChevronUp, KeyRound } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 
 type Settings = {
   telegramBotToken?: string | null;
@@ -143,6 +144,35 @@ export default function SettingsClient({
       toast.error("Failed to send test notification. Check your configuration.");
     }
     setTesting(false);
+  }
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    setChangingPassword(true);
+    const { error } = await authClient.changePassword({ currentPassword, newPassword });
+    if (error) {
+      toast.error(error.message ?? "Failed to change password");
+    } else {
+      toast.success("Password changed successfully");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    setChangingPassword(false);
   }
 
   // Email provider state
@@ -394,6 +424,50 @@ export default function SettingsClient({
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Change password</CardTitle>
+              <CardDescription>Update your account password.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Current password</Label>
+                  <Input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>New password</Label>
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirm new password</Label>
+                  <Input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                  />
+                </div>
+                <Button type="submit" variant="outline" disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}>
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  {changingPassword ? "Changing…" : "Change password"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Field types */}
