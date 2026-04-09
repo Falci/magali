@@ -10,7 +10,7 @@ type ContactResult = {
   id: string;
   firstName: string;
   lastName: string | null;
-  company: { id: string; name: string } | null;
+  jobTitle: string | null;
 };
 
 export default function HeaderSearch() {
@@ -120,7 +120,7 @@ export default function HeaderSearch() {
                 )}
               >
                 <span className="font-medium">{c.firstName} {c.lastName}</span>
-                {c.company && <span className="text-muted-foreground text-xs truncate">{c.company.name}</span>}
+                {c.jobTitle && <span className="text-muted-foreground text-xs truncate">{c.jobTitle}</span>}
               </Link>
             ))
           )}
