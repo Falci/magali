@@ -43,7 +43,7 @@ export default function AddInteractionForm({ contactId }: { contactId: string })
       <div className="flex gap-2">
         <Select value={type} onValueChange={(v) => setType(v ?? type)}>
           <SelectTrigger className="w-36">
-            <SelectValue />
+            <SelectValue className="capitalize" />
           </SelectTrigger>
           <SelectContent>
             {INTERACTION_TYPES.map((t) => (
