@@ -497,13 +497,27 @@ export default function SettingsClient({
         <TabsContent value="notifications" className="space-y-4 pt-2">
           <Card>
             <CardHeader>
-              <CardTitle>Telegram</CardTitle>
-              <CardDescription>
-                Create a bot via{" "}
-                <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="underline">@BotFather</a>.
-                {" "}Get your chat ID from{" "}
-                <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="underline">@userinfobot</a>.
-              </CardDescription>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle>Telegram</CardTitle>
+                  <CardDescription className="mt-1">
+                    Create a bot via{" "}
+                    <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="underline">@BotFather</a>.
+                    {" "}Get your chat ID from{" "}
+                    <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="underline">@userinfobot</a>.
+                  </CardDescription>
+                </div>
+                {(settings.telegramBotToken || settings.telegramChatId) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => { set("telegramBotToken", null); set("telegramChatId", null); }}
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" />Disconnect
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -528,8 +542,25 @@ export default function SettingsClient({
 
           <Card>
             <CardHeader>
-              <CardTitle>Email (SMTP)</CardTitle>
-              <CardDescription>Receive daily digests via email</CardDescription>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle>Email (SMTP)</CardTitle>
+                  <CardDescription className="mt-1">Receive daily digests via email</CardDescription>
+                </div>
+                {(settings.smtpHost || settings.smtpPass) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => {
+                      setSmtpProvider("");
+                      (["smtpHost", "smtpPort", "smtpUser", "smtpPass", "smtpFrom", "smtpTo"] as const).forEach((k) => set(k, null));
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" />Disconnect
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
