@@ -1,34 +1,5 @@
-import { requireSession } from "@/lib/session";
-import { prisma } from "@/lib/db";
-import SettingsClient from "./settings-client";
+import { redirect } from "next/navigation";
 
-const DEFAULT_FIELD_LABELS = [
-  { field: "email", label: "home" },
-  { field: "email", label: "work" },
-  { field: "email", label: "other" },
-  { field: "phone", label: "mobile" },
-  { field: "phone", label: "home" },
-  { field: "phone", label: "work" },
-  { field: "phone", label: "other" },
-  { field: "address", label: "home" },
-  { field: "address", label: "work" },
-  { field: "address", label: "other" },
-];
-
-export default async function SettingsPage() {
-  await requireSession();
-
-  // Seed defaults if none exist yet
-  await prisma.fieldLabel.createMany({
-    data: DEFAULT_FIELD_LABELS,
-    skipDuplicates: true,
-  });
-
-  const [settings, fieldLabels, tags] = await Promise.all([
-    prisma.settings.findUnique({ where: { id: "singleton" } }),
-    prisma.fieldLabel.findMany({ orderBy: [{ field: "asc" }, { label: "asc" }] }),
-    prisma.tag.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { contacts: true } } } }),
-  ]);
-
-  return <SettingsClient initialSettings={settings ?? null} fieldLabels={fieldLabels} initialTags={tags} />;
+export default function SettingsPage() {
+  redirect("/settings/general");
 }
