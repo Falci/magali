@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, LayoutGrid, List } from "lucide-react";
 import type { UpcomingEvent } from "@/lib/events";
 
 const EVENT_EMOJI: Record<string, string> = {
@@ -42,6 +42,17 @@ export default function EventsClient({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"cards" | "list">("cards");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("events-view");
+    if (saved === "list" || saved === "cards") setView(saved);
+  }, []);
+
+  function setViewAndPersist(v: "cards" | "list") {
+    setView(v);
+    localStorage.setItem("events-view", v);
+  }
   const [form, setForm] = useState({
     title: "",
     date: "",
@@ -103,6 +114,27 @@ export default function EventsClient({
           <h1 className="text-2xl font-semibold">Events</h1>
           <p className="text-sm text-muted-foreground">{upcomingEvents.length} upcoming in the next year</p>
         </div>
+        <div className="flex gap-2">
+          <div className="flex rounded-md border overflow-hidden">
+            <Button
+              variant={view === "cards" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setViewAndPersist("cards")}
+              title="Card view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={view === "list" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0 border-l"
+              onClick={() => setViewAndPersist("list")}
+              title="List view"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger>
             <Button><Plus className="h-4 w-4 mr-2" />Add event</Button>
@@ -170,6 +202,7 @@ export default function EventsClient({
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {upcomingEvents.length === 0 ? (
@@ -178,7 +211,7 @@ export default function EventsClient({
           <p className="font-medium">No upcoming events</p>
           <p className="text-sm">Add events or birthdays to your contacts to see them here.</p>
         </div>
-      ) : (
+      ) : view === "cards" ? (
         <div className="space-y-6">
           {Object.entries(grouped).map(([month, events]) => (
             <div key={month}>
@@ -220,6 +253,39 @@ export default function EventsClient({
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border divide-y">
+          {upcomingEvents.map((ev) => (
+            <div key={ev.id} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="text-lg shrink-0">{EVENT_EMOJI[ev.type] ?? "📅"}</span>
+              <div className="flex-1 min-w-0 flex items-center gap-4">
+                <p className="font-medium text-sm truncate min-w-32">{ev.title}</p>
+                <span className="text-sm text-muted-foreground shrink-0">{format(ev.nextDate, "MMM d, yyyy")}</span>
+                {ev.contactName && (
+                  <Link href={`/contacts/${ev.contactId}`} className="text-xs text-muted-foreground hover:underline hidden sm:block truncate">
+                    {ev.contactName}
+                  </Link>
+                )}
+                {ev.recurring && <Badge variant="outline" className="text-xs shrink-0">{ev.recurring === "YEARLY" ? "yearly" : "monthly"}</Badge>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Badge variant={ev.daysUntil === 0 ? "default" : ev.daysUntil <= 7 ? "destructive" : "secondary"} className="text-xs">
+                  {ev.daysUntil === 0 ? "Today" : ev.daysUntil === 1 ? "Tomorrow" : `${ev.daysUntil}d`}
+                </Badge>
+                {!ev.id.startsWith("birthday-") && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleDelete(ev.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             </div>
           ))}

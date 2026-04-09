@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { UserPlus, Search, EyeOff } from "lucide-react";
+import { UserPlus, Search, EyeOff, LayoutGrid, List } from "lucide-react";
 
 type Tag = { id: string; name: string; color: string | null };
 type Contact = {
@@ -34,6 +34,17 @@ export default function ContactsClient({
   const [q, setQ] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showDeprioritized, setShowDeprioritized] = useState(false);
+  const [view, setView] = useState<"cards" | "list">("cards");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("contacts-view");
+    if (saved === "list" || saved === "cards") setView(saved);
+  }, []);
+
+  function setViewAndPersist(v: "cards" | "list") {
+    setView(v);
+    localStorage.setItem("contacts-view", v);
+  }
 
   const filtered = useMemo(() => {
     const lower = q.toLowerCase();
@@ -81,6 +92,26 @@ export default function ContactsClient({
               {showDeprioritized ? "Hide deprioritized" : `+${deprioritizedCount} hidden`}
             </Button>
           )}
+          <div className="flex rounded-md border overflow-hidden">
+            <Button
+              variant={view === "cards" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0"
+              onClick={() => setViewAndPersist("cards")}
+              title="Card view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={view === "list" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none border-0 border-l"
+              onClick={() => setViewAndPersist("list")}
+              title="List view"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
           <Button render={<Link href="/contacts/new" />}>
             <UserPlus className="h-4 w-4 mr-2" />
             Add contact
@@ -132,7 +163,7 @@ export default function ContactsClient({
             </div>
           )}
         </div>
-      ) : (
+      ) : view === "cards" ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((contact) => (
             <Link key={contact.id} href={`/contacts/${contact.id}`}>
@@ -172,6 +203,43 @@ export default function ContactsClient({
                   </div>
                 </CardContent>
               </Card>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border divide-y">
+          {filtered.map((contact) => (
+            <Link key={contact.id} href={`/contacts/${contact.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+              <Avatar className="h-7 w-7 shrink-0">
+                {contact.photo ? (
+                  <img src={contact.photo} alt="" className="h-full w-full object-cover rounded-full" />
+                ) : (
+                  <AvatarFallback className="text-xs">{initials(contact)}</AvatarFallback>
+                )}
+              </Avatar>
+              <div className="min-w-0 flex-1 flex items-center gap-4">
+                <p className="font-medium text-sm truncate min-w-32">
+                  {contact.firstName} {contact.lastName}
+                  {contact.nickname && (
+                    <span className="text-muted-foreground font-normal"> "{contact.nickname}"</span>
+                  )}
+                </p>
+                {contact.company && (
+                  <p className="text-sm text-muted-foreground truncate hidden sm:block">{contact.company.name}</p>
+                )}
+                {contact.emails[0] && (
+                  <p className="text-xs text-muted-foreground truncate hidden md:block">{contact.emails[0].value}</p>
+                )}
+              </div>
+              {contact.tags.length > 0 && (
+                <div className="flex gap-1 shrink-0">
+                  {contact.tags.slice(0, 2).map(({ tag }) => (
+                    <Badge key={tag.id} variant="secondary" className="text-xs px-1.5 py-0">
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </Link>
           ))}
         </div>
