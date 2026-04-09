@@ -98,45 +98,74 @@ export default function GraphClient({
     });
   }
 
-  // Filter contacts by active tag
-  const visibleContactIds = useMemo(() => {
+  // The full graph data — never changes based on filters (prevents ForceGraph2D from resetting viewport)
+  const stableGraphData = useMemo(() => ({
+    nodes: contacts.map((c) => ({
+      id: c.id,
+      name: `${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`,
+      staleDays: c.staleDays,
+    })),
+    links: relationships.map((r) => ({ source: r.fromId, target: r.toId, type: r.type })),
+  }), [contacts, relationships]);
+
+  // Contacts visible due to tag filter
+  const tagVisibleIds = useMemo(() => {
     if (!activeTagId) return null;
     return new Set(contacts.filter((c) => c.tags.some((t) => t.tagId === activeTagId)).map((c) => c.id));
   }, [contacts, activeTagId]);
 
-  const graphData = useMemo(() => {
-    const visibleRels: GraphLink[] = relationships
-      .filter((r) => !hiddenTypes.has(r.type))
-      .map((r) => ({ source: r.fromId, target: r.toId, type: r.type }));
+  // Active contact IDs = contacts that have at least one visible (non-hidden-type, tag-filtered) link
+  const activeContactIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const r of relationships) {
+      if (hiddenTypes.has(r.type)) continue;
+      if (tagVisibleIds && (!tagVisibleIds.has(r.fromId) || !tagVisibleIds.has(r.toId))) continue;
+      ids.add(r.fromId);
+      ids.add(r.toId);
+    }
+    return ids;
+  }, [relationships, hiddenTypes, tagVisibleIds]);
 
-    const filteredRels = visibleContactIds
-      ? visibleRels.filter((r) => visibleContactIds.has(r.source) && visibleContactIds.has(r.target))
-      : visibleRels;
+  // Visibility callbacks — filters without changing graphData, so viewport is preserved
+  const nodeVisibility = useCallback((node: GraphNode) => {
+    if (tagVisibleIds && !tagVisibleIds.has(node.id)) return false;
+    if (hideOrphans && !activeContactIds.has(node.id)) return false;
+    return true;
+  }, [tagVisibleIds, hideOrphans, activeContactIds]);
 
-    const filteredContacts = visibleContactIds
-      ? contacts.filter((c) => visibleContactIds.has(c.id))
-      : contacts;
+  const linkVisibility = useCallback((link: GraphLink) => {
+    const src = typeof link.source === "object" ? (link.source as GraphNode).id : link.source;
+    const tgt = typeof link.target === "object" ? (link.target as GraphNode).id : link.target;
+    if (hiddenTypes.has(link.type)) return false;
+    if (tagVisibleIds && (!tagVisibleIds.has(src) || !tagVisibleIds.has(tgt))) return false;
+    return true;
+  }, [hiddenTypes, tagVisibleIds]);
 
-    const activeContactIds = new Set(filteredRels.flatMap((r) => [r.source, r.target]));
+  // Stats for header
+  const visibleNodeCount = useMemo(() => {
+    let count = 0;
+    for (const c of contacts) {
+      if (tagVisibleIds && !tagVisibleIds.has(c.id)) continue;
+      if (hideOrphans && !activeContactIds.has(c.id)) continue;
+      count++;
+    }
+    return count;
+  }, [contacts, tagVisibleIds, hideOrphans, activeContactIds]);
 
-    const contactNodes: GraphNode[] = (hideOrphans
-      ? filteredContacts.filter((c) => activeContactIds.has(c.id))
-      : filteredContacts
-    ).map((c) => ({
-      id: c.id,
-      name: `${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`,
-      staleDays: c.staleDays,
-    }));
+  const visibleLinkCount = useMemo(() => {
+    let count = 0;
+    for (const r of relationships) {
+      if (hiddenTypes.has(r.type)) continue;
+      if (tagVisibleIds && (!tagVisibleIds.has(r.fromId) || !tagVisibleIds.has(r.toId))) continue;
+      count++;
+    }
+    return count;
+  }, [relationships, hiddenTypes, tagVisibleIds]);
 
-    return { nodes: contactNodes, links: filteredRels, activeContactIds };
-  }, [contacts, relationships, hiddenTypes, hideOrphans, visibleContactIds]);
-
-  // Stable ref for graphData to pass to ForceGraph2D (avoids prop identity change on unrelated re-renders)
-  const stableGraphData = useMemo(
-    () => ({ nodes: graphData.nodes, links: graphData.links }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [graphData.nodes, graphData.links]
-  );
+  const orphanCount = useMemo(() => {
+    const base = tagVisibleIds ? contacts.filter((c) => tagVisibleIds.has(c.id)) : contacts;
+    return base.filter((c) => !activeContactIds.has(c.id)).length;
+  }, [contacts, tagVisibleIds, activeContactIds]);
 
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
@@ -153,7 +182,7 @@ export default function GraphClient({
       const fontSize = Math.max(10, 14 / globalScale);
 
       const r = 6;
-      const isActive = graphData.activeContactIds.has(node.id);
+      const isActive = activeContactIds.has(node.id);
       const isDeprioritized = node.staleDays === 0;
 
       ctx.beginPath();
@@ -170,7 +199,7 @@ export default function GraphClient({
       ctx.textBaseline = "top";
       ctx.fillText(label, x, y + r + 2);
     },
-    [graphData.activeContactIds]
+    [activeContactIds]
   );
 
   const linkColor = useCallback(
@@ -205,20 +234,12 @@ export default function GraphClient({
     `;
   }, []);
 
-  const orphanCount = useMemo(() => {
-    const activeIds = graphData.activeContactIds;
-    const filtered = visibleContactIds
-      ? contacts.filter((c) => visibleContactIds.has(c.id))
-      : contacts;
-    return filtered.filter((c) => !activeIds.has(c.id)).length;
-  }, [contacts, graphData.activeContactIds, visibleContactIds]);
-
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
         <h1 className="text-xl font-semibold">Relationship graph</h1>
         <p className="text-sm text-muted-foreground">
-          {graphData.nodes.length} contacts · {graphData.links.length} edges
+          {visibleNodeCount} contacts · {visibleLinkCount} edges
         </p>
       </div>
 
@@ -230,6 +251,8 @@ export default function GraphClient({
             graphData={stableGraphData}
             width={dimensions.width}
             height={dimensions.height}
+            nodeVisibility={nodeVisibility as never}
+            linkVisibility={linkVisibility as never}
             nodeCanvasObject={nodeCanvasObject as never}
             nodePointerAreaPaint={((node: GraphNode & { x?: number; y?: number }, color: string, ctx: CanvasRenderingContext2D) => {
               ctx.beginPath();
@@ -247,7 +270,6 @@ export default function GraphClient({
             d3AlphaDecay={0.02}
             d3VelocityDecay={0.3}
             onEngineStop={() => {
-              // After initial layout, apply stronger charge for better spacing
               if (graphRef.current) {
                 graphRef.current.d3Force("charge")?.strength(-150);
               }
