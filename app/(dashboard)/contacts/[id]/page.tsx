@@ -88,7 +88,13 @@ export default async function ContactDetailPage({
           {(contact.jobTitle || contact.company) && (
             <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
               <Briefcase className="h-3.5 w-3.5" />
-              {[contact.jobTitle, contact.company?.name].filter(Boolean).join(" at ")}
+              {contact.jobTitle && <span>{contact.jobTitle}</span>}
+              {contact.jobTitle && contact.company && <span>at</span>}
+              {contact.company && (
+                <Link href={`/companies/${contact.company.id}`} className="hover:underline hover:text-foreground">
+                  {contact.company.name}
+                </Link>
+              )}
             </p>
           )}
           {contact.tags.length > 0 && (
