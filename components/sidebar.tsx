@@ -38,7 +38,7 @@ export default function Sidebar() {
 
   return (
     <aside className="hidden md:flex flex-col w-56 border-r bg-card shrink-0">
-      <div className="p-4 border-b">
+      <div className="h-12 border-b flex items-center px-4 shrink-0">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-lg">
           <span className="text-2xl">🍉</span>
           <span>Magali</span>
