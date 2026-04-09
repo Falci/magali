@@ -376,7 +376,7 @@ export default function SettingsClient({
                   value={settings.dateFormat ?? "MMM d, yyyy"}
                   onValueChange={(v) => set("dateFormat", v ?? "MMM d, yyyy")}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
