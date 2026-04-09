@@ -12,11 +12,20 @@ export async function POST(
   const { id: contactId } = await params;
   const { type, date, time, notes } = await req.json();
 
+  // Parse date-only strings (YYYY-MM-DD) as local noon to avoid UTC-midnight timezone drift
+  let parsedDate: Date;
+  if (date) {
+    const [y, m, d] = (date as string).split("-").map(Number);
+    parsedDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  } else {
+    parsedDate = new Date();
+  }
+
   const interaction = await prisma.interaction.create({
     data: {
       contactId,
       type,
-      date: date ? new Date(date) : new Date(),
+      date: parsedDate,
       time: time ?? null,
       notes: notes ?? null,
     },

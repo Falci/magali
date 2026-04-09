@@ -59,10 +59,18 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
+  // Parse date-only strings (YYYY-MM-DD) as noon UTC to avoid timezone drift
+  let eventDate: Date;
+  if (body.date && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+    const [y, m, d] = body.date.split("-").map(Number);
+    eventDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  } else {
+    eventDate = new Date(body.date);
+  }
   const event = await prisma.event.create({
     data: {
       ...body,
-      date: new Date(body.date),
+      date: eventDate,
       contactId: body.contactId || null,
     },
     include: { contact: { select: { id: true, firstName: true, lastName: true } } },

@@ -10,15 +10,19 @@ import { Input } from "@/components/ui/input";
 
 const INTERACTION_TYPES = ["call", "message", "in-person", "email", "video", "letter", "other"];
 
+function localDateString(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function AddInteractionForm({ contactId }: { contactId: string }) {
   const router = useRouter();
   const [type, setType] = useState("call");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateString(new Date()));
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isScheduled = date > new Date().toISOString().slice(0, 10);
+  const isScheduled = date > localDateString(new Date());
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
