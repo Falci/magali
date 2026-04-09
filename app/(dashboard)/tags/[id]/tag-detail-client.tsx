@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Trash2, X } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -69,23 +68,19 @@ export default function TagDetailClient({ tag: initial }: { tag: Tag }) {
         </Button>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <Badge
-            variant="outline"
-            className="text-lg px-3 py-1"
-            style={tag.color ? { borderColor: tag.color, color: tag.color } : {}}
-          >
+          <h1 className="text-2xl font-semibold" style={tag.color ? { color: tag.color } : {}}>
             {tag.name}
-          </Badge>
-          <p className="text-sm text-muted-foreground mt-1">
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {tag.contacts.length} contact{tag.contacts.length !== 1 ? "s" : ""}
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="text-destructive hover:text-destructive"
+          className="text-destructive hover:text-destructive shrink-0"
           onClick={() => setDeleteOpen(true)}
         >
           <Trash2 className="h-3.5 w-3.5 mr-1" />Delete tag
