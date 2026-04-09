@@ -726,6 +726,19 @@ export default function SettingsClient({
                   Generate a DAV token to enable sync. Existing connections will need to be updated when you regenerate.
                 </p>
               )}
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  render={<a href="/api/dav/mobileconfig" download />}
+                  disabled={!settings.davToken}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download macOS profile (.mobileconfig)
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Installs both CalDAV and CardDAV accounts with your current DAV token.
+                </p>
+              </div>
               <Separator />
               <div>
                 <button

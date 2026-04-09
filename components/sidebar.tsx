@@ -49,7 +49,7 @@ export default function Sidebar() {
             href={href}
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              pathname === href || (href !== "/dashboard" && pathname.startsWith(href))
+              pathname === href || (href !== "/dashboard" && (pathname?.startsWith(href) ?? false))
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
