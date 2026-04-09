@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { requireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getDateFormat } from "@/lib/date-format";
 import { formatBirthday } from "@/lib/birthday";
 import type {
-  ContactEmail, ContactPhone, ContactAddress, Interaction,
+  ContactEmail, ContactPhone, ContactAddress,
   Relationship, Contact, Tag, ContactTag,
 } from "@prisma/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Mail, Phone, MapPin, Cake, Edit, ArrowLeft } from "lucide-react";
 import DeleteContactButton from "./delete-contact-button";
 import AddInteractionForm from "./add-interaction-form";
+import InteractionLog from "./interaction-log";
 import RelationshipsSection from "./relationships-section";
 
 export default async function ContactDetailPage({
@@ -52,7 +53,6 @@ export default async function ContactDetailPage({
 
   const now = new Date();
   const initials = `${contact.firstName[0] ?? ""}${contact.lastName?.[0] ?? ""}`.toUpperCase();
-  const scheduledInteractions = contact.interactions.filter((i) => new Date(i.date) > now);
   const pastInteractions = contact.interactions.filter((i) => new Date(i.date) <= now);
   const lastInteraction = pastInteractions[0];
   const relationships = [
@@ -184,44 +184,7 @@ export default async function ContactDetailPage({
         <CardContent className="space-y-4">
           <AddInteractionForm contactId={id} />
           <Separator />
-          {scheduledInteractions.length === 0 && pastInteractions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No interactions logged yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {scheduledInteractions.length > 0 && (
-                <>
-                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Scheduled</p>
-                  {scheduledInteractions.map((interaction) => (
-                    <div key={interaction.id} className="flex gap-3 text-sm">
-                      <div className="shrink-0 text-xs text-muted-foreground w-24 pt-0.5">
-                        {format(new Date(interaction.date), dateFormat)}
-                      </div>
-                      <div>
-                        <span className="font-medium capitalize">{interaction.type}</span>
-                        {interaction.notes && (
-                          <p className="text-muted-foreground mt-0.5">{interaction.notes}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {pastInteractions.length > 0 && <Separator />}
-                </>
-              )}
-              {pastInteractions.map((interaction) => (
-                <div key={interaction.id} className="flex gap-3 text-sm">
-                  <div className="shrink-0 text-xs text-muted-foreground w-24 pt-0.5">
-                    {format(new Date(interaction.date), dateFormat)}
-                  </div>
-                  <div>
-                    <span className="font-medium capitalize">{interaction.type}</span>
-                    {interaction.notes && (
-                      <p className="text-muted-foreground mt-0.5">{interaction.notes}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <InteractionLog initialInteractions={contact.interactions} dateFormat={dateFormat} />
         </CardContent>
       </Card>
     </div>
