@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 const settingsNav = [
   { href: "/settings/general", label: "General" },
   { href: "/settings/field-types", label: "Field types" },
-  { href: "/settings/tags", label: "Tags" },
   { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/dav", label: "CalDAV / CardDAV" },
   { href: "/settings/import", label: "Import" },

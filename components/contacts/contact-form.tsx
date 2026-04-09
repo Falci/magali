@@ -10,11 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, X, Check, ChevronDown, Building2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { LabelCombobox } from "@/components/contacts/label-combobox";
 import { Switch } from "@/components/ui/switch";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 type MultiField = { label: string; value: string };
 type Tag = { id: string; name: string; color: string | null };
@@ -23,8 +21,6 @@ type ContactFormData = {
   firstName: string;
   lastName: string;
   nickname: string;
-  companyId: string;
-  companyName: string;
   jobTitle: string;
   gender: string;        // "male" | "female" | "other" | ""
   birthdayMonth: string; // "1"–"12" or ""
@@ -49,8 +45,6 @@ const defaultForm = (): ContactFormData => ({
   firstName: "",
   lastName: "",
   nickname: "",
-  companyId: "",
-  companyName: "",
   jobTitle: "",
   gender: "",
   birthdayMonth: "",
@@ -63,8 +57,6 @@ const defaultForm = (): ContactFormData => ({
   addresses: [],
   tagIds: [],
 });
-
-type CompanyOption = { id: string; name: string };
 
 /** Returns "dmy" | "mdy" | "ymd" based on the date format string */
 function birthdayFieldOrder(dateFormat: string): ["month" | "day" | "year", "month" | "day" | "year", "month" | "day" | "year"] {
@@ -80,7 +72,6 @@ export default function ContactForm({
   initialData,
   contactId,
   allTags,
-  allCompanies = [],
   emailLabels = ["home", "work", "other"],
   phoneLabels = ["mobile", "home", "work", "other"],
   addressLabels = ["home", "work", "other"],
@@ -90,7 +81,6 @@ export default function ContactForm({
   initialData?: Partial<ContactFormData>;
   contactId?: string;
   allTags: Tag[];
-  allCompanies?: CompanyOption[];
   emailLabels?: string[];
   phoneLabels?: string[];
   addressLabels?: string[];
@@ -101,8 +91,6 @@ export default function ContactForm({
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<ContactFormData>({ ...defaultForm(), ...initialData });
   const [newTagName, setNewTagName] = useState("");
-  const [companySearch, setCompanySearch] = useState(initialData?.companyName ?? "");
-  const [companyOpen, setCompanyOpen] = useState(false);
 
   const bdayOrder = birthdayFieldOrder(dateFormat);
 
@@ -165,8 +153,6 @@ export default function ContactForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        companyId: form.companyId || null,
-        companyName: !form.companyId && companySearch.trim() ? companySearch.trim() : null,
         birthdayMonth: form.birthdayMonth ? parseInt(form.birthdayMonth) : null,
         birthdayDay: form.birthdayDay ? parseInt(form.birthdayDay) : null,
         birthdayYear: form.birthdayYear ? parseInt(form.birthdayYear) : null,
@@ -205,68 +191,6 @@ export default function ContactForm({
           <div className="space-y-2">
             <Label htmlFor="nickname">Nickname</Label>
             <Input id="nickname" value={form.nickname} onChange={(e) => set("nickname", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Company</Label>
-            <Popover open={companyOpen} onOpenChange={(o) => { setCompanyOpen(o); if (!o && !form.companyId) { /* keep free-text */ } }}>
-              <PopoverTrigger
-                type="button"
-                className="flex h-9 w-full items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent px-3 text-sm whitespace-nowrap outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <span className={cn("flex-1 truncate text-left", !form.companyId && !companySearch && "text-muted-foreground")}>
-                  {form.companyId ? (allCompanies.find((c) => c.id === form.companyId)?.name ?? companySearch) : (companySearch || "No company")}
-                </span>
-                <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-72 p-1">
-                <div className="p-1 pb-1.5">
-                  <Input
-                    placeholder="Search or type a company name…"
-                    value={companySearch}
-                    onChange={(e) => {
-                      setCompanySearch(e.target.value);
-                      set("companyId", "");
-                    }}
-                    className="h-7 text-sm"
-                    autoFocus
-                  />
-                </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {/* Clear option */}
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-left hover:bg-muted text-muted-foreground"
-                    onClick={() => { set("companyId", ""); setCompanySearch(""); setCompanyOpen(false); }}
-                  >
-                    <X className="size-3.5 shrink-0" /> No company
-                  </button>
-                  {allCompanies
-                    .filter((c) => !companySearch || c.name.toLowerCase().includes(companySearch.toLowerCase()))
-                    .map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-left hover:bg-muted"
-                        onClick={() => { set("companyId", c.id); setCompanySearch(c.name); setCompanyOpen(false); }}
-                      >
-                        <Check className={cn("size-3.5 shrink-0", form.companyId === c.id ? "opacity-100" : "opacity-0")} />
-                        <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
-                        {c.name}
-                      </button>
-                    ))}
-                  {companySearch.trim() && !allCompanies.some((c) => c.name.toLowerCase() === companySearch.toLowerCase()) && (
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-left hover:bg-muted text-muted-foreground"
-                      onClick={() => { set("companyId", ""); setCompanyOpen(false); }}
-                    >
-                      <Plus className="size-3.5 shrink-0" />
-                      Create: <span className="font-medium text-foreground ml-1">{companySearch.trim()}</span>
-                    </button>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
           </div>
           <div className="space-y-2">
             <Label htmlFor="jobTitle">Job title</Label>

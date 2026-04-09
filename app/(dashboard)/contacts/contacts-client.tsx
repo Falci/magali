@@ -15,7 +15,7 @@ type Contact = {
   firstName: string;
   lastName: string | null;
   nickname: string | null;
-  company: { id: string; name: string } | null;
+  jobTitle: string | null;
   photo: string | null;
   staleDays: number | null;
   emails: { label: string; value: string }[];
@@ -57,7 +57,7 @@ export default function ContactsClient({
         c.firstName.toLowerCase().includes(lower) ||
         (c.lastName ?? "").toLowerCase().includes(lower) ||
         (c.nickname ?? "").toLowerCase().includes(lower) ||
-        (c.company?.name ?? "").toLowerCase().includes(lower) ||
+        (c.jobTitle ?? "").toLowerCase().includes(lower) ||
         c.emails.some((e) => e.value.toLowerCase().includes(lower));
 
       const matchesTag =
@@ -184,8 +184,8 @@ export default function ContactsClient({
                           <span className="text-muted-foreground text-sm font-normal"> "{contact.nickname}"</span>
                         )}
                       </p>
-                      {contact.company && (
-                        <p className="text-sm text-muted-foreground truncate">{contact.company.name}</p>
+                      {contact.jobTitle && (
+                        <p className="text-sm text-muted-foreground truncate">{contact.jobTitle}</p>
                       )}
                       {contact.emails[0] && (
                         <p className="text-xs text-muted-foreground truncate mt-0.5">{contact.emails[0].value}</p>
@@ -224,8 +224,8 @@ export default function ContactsClient({
                     <span className="text-muted-foreground font-normal"> "{contact.nickname}"</span>
                   )}
                 </p>
-                {contact.company && (
-                  <p className="text-sm text-muted-foreground truncate hidden sm:block">{contact.company.name}</p>
+                {contact.jobTitle && (
+                  <p className="text-sm text-muted-foreground truncate hidden sm:block">{contact.jobTitle}</p>
                 )}
                 {contact.emails[0] && (
                   <p className="text-xs text-muted-foreground truncate hidden md:block">{contact.emails[0].value}</p>

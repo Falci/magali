@@ -15,7 +15,7 @@ import {
   Settings,
   LogOut,
   Network,
-  Building2,
+  Tag,
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
@@ -23,7 +23,7 @@ import {
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/contacts", label: "Contacts", icon: Users },
-  { href: "/companies", label: "Companies", icon: Building2 },
+  { href: "/tags", label: "Tags", icon: Tag },
   { href: "/events", label: "Events", icon: CalendarDays },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/graph", label: "Graph", icon: Network },
@@ -32,7 +32,6 @@ const mainNavItems = [
 const settingsSubItems = [
   { href: "/settings/general", label: "General" },
   { href: "/settings/field-types", label: "Field types" },
-  { href: "/settings/tags", label: "Tags" },
   { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/dav", label: "CalDAV / CardDAV" },
   { href: "/settings/import", label: "Import" },

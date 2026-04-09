@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Mail, Phone, MapPin, Briefcase, Cake, Edit, ArrowLeft } from "lucide-react";
+import { Mail, Phone, MapPin, Cake, Edit, ArrowLeft } from "lucide-react";
 import DeleteContactButton from "./delete-contact-button";
 import AddInteractionForm from "./add-interaction-form";
 import RelationshipsSection from "./relationships-section";
@@ -35,7 +35,6 @@ export default async function ContactDetailPage({
       phones: true,
       addresses: true,
       tags: { include: { tag: true } },
-      company: true,
       interactions: { orderBy: { date: "desc" }, take: 20 },
       events: { orderBy: { date: "asc" } },
       relationshipsFrom: { include: { to: { select: { id: true, firstName: true, lastName: true, gender: true } } } },
@@ -85,17 +84,8 @@ export default async function ContactDetailPage({
               <span className="text-muted-foreground text-lg font-normal ml-2">"{contact.nickname}"</span>
             )}
           </h1>
-          {(contact.jobTitle || contact.company) && (
-            <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Briefcase className="h-3.5 w-3.5" />
-              {contact.jobTitle && <span>{contact.jobTitle}</span>}
-              {contact.jobTitle && contact.company && <span>at</span>}
-              {contact.company && (
-                <Link href={`/companies/${contact.company.id}`} className="hover:underline hover:text-foreground">
-                  {contact.company.name}
-                </Link>
-              )}
-            </p>
+          {contact.jobTitle && (
+            <p className="text-muted-foreground text-sm mt-0.5">{contact.jobTitle}</p>
           )}
           {contact.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">

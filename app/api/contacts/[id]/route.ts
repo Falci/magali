@@ -7,7 +7,6 @@ const contactInclude = {
   phones: true,
   addresses: true,
   tags: { include: { tag: true } },
-  company: true,
   interactions: { orderBy: { date: "desc" as const }, take: 50 },
   events: { orderBy: { date: "asc" as const } },
   relationshipsFrom: { include: { to: true } },
@@ -36,17 +35,7 @@ export async function PUT(
 
   const { id } = await params;
   const body = await req.json();
-  const { emails, phones, addresses, tagIds, companyName, companyId: rawCompanyId, ...rest } = body;
-
-  let companyId = rawCompanyId ?? null;
-  if (companyId === undefined && companyName?.trim()) {
-    const co = await prisma.company.upsert({
-      where: { name: companyName.trim() },
-      create: { name: companyName.trim() },
-      update: {},
-    });
-    companyId = co.id;
-  }
+  const { emails, phones, addresses, tagIds, ...rest } = body;
 
   // Replace nested records
   await prisma.$transaction([
@@ -60,7 +49,6 @@ export async function PUT(
     where: { id },
     data: {
       ...rest,
-      companyId: companyId,
       emails: emails?.length ? { create: emails } : undefined,
       phones: phones?.length ? { create: phones } : undefined,
       addresses: addresses?.length ? { create: addresses } : undefined,

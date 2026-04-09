@@ -96,14 +96,16 @@ export async function POST(req: NextRequest) {
               tagIds.push(tag.id);
             }
 
-            let importedCompanyId: string | undefined;
+            // Import company as a tag
             if (t.company?.trim()) {
-              const co = await prisma.company.upsert({
+              const companyTag = await prisma.tag.upsert({
                 where: { name: t.company.trim() },
                 create: { name: t.company.trim() },
                 update: {},
               });
-              importedCompanyId = co.id;
+              if (!tagIds.includes(companyTag.id)) {
+                tagIds.push(companyTag.id);
+              }
             }
 
             const created = await prisma.contact.create({
@@ -111,7 +113,6 @@ export async function POST(req: NextRequest) {
                 firstName: t.firstName,
                 lastName: t.lastName,
                 nickname: t.nickname,
-                companyId: importedCompanyId,
                 jobTitle: t.jobTitle,
                 notes: t.notes,
                 birthdayDay: t.birthdayDay,

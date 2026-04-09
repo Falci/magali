@@ -14,10 +14,8 @@ type Contact = {
   firstName: string;
   lastName: string | null;
   staleDays: number | null;
-  companyId: string | null;
   tags: { tagId: string }[];
 };
-type Company = { id: string; name: string };
 type Relationship = { id: string; fromId: string; toId: string; type: string };
 type Tag = { id: string; name: string; color: string | null };
 
@@ -36,7 +34,6 @@ const RELATIONSHIP_COLORS: Record<string, string> = {
   "ex-spouse":  "#ef4444",
   "ex-partner": "#ef4444",
   other:        "#94a3b8",
-  company:      "#8b5cf6",
 };
 
 function getColor(type: string) {
@@ -47,18 +44,15 @@ type GraphNode = {
   id: string;
   name: string;
   staleDays: number | null;
-  isCompany?: boolean;
 };
 type GraphLink = { source: string; target: string; type: string };
 
 export default function GraphClient({
   contacts,
-  companies,
   relationships,
   tags,
 }: {
   contacts: Contact[];
-  companies: Company[];
   relationships: Relationship[];
   tags: Tag[];
 }) {
@@ -93,10 +87,7 @@ export default function GraphClient({
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
   const [highlightedType, setHighlightedType] = useState<string | null>(null);
   const [hideOrphans, setHideOrphans] = useState(false);
-  const [showCompanyNodes, setShowCompanyNodes] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
-
-  const companyMap = useMemo(() => new Map(companies.map((c) => [c.id, c])), [companies]);
 
   function toggleType(type: string) {
     setHiddenTypes((prev) => {
@@ -128,21 +119,6 @@ export default function GraphClient({
 
     const activeContactIds = new Set(filteredRels.flatMap((r) => [r.source, r.target]));
 
-    // Company nodes and links
-    const companyNodeIds = new Set<string>();
-    const companyLinks: GraphLink[] = [];
-    if (showCompanyNodes) {
-      for (const c of filteredContacts) {
-        if (c.companyId && companyMap.has(c.companyId)) {
-          companyNodeIds.add(c.companyId);
-          companyLinks.push({ source: c.id, target: `company-${c.companyId}`, type: "company" });
-          activeContactIds.add(c.id);
-        }
-      }
-    }
-
-    const allLinks = [...filteredRels, ...companyLinks];
-
     const contactNodes: GraphNode[] = (hideOrphans
       ? filteredContacts.filter((c) => activeContactIds.has(c.id))
       : filteredContacts
@@ -150,20 +126,10 @@ export default function GraphClient({
       id: c.id,
       name: `${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`,
       staleDays: c.staleDays,
-      isCompany: false,
     }));
 
-    const companyNodes: GraphNode[] = showCompanyNodes
-      ? [...companyNodeIds].map((cid) => ({
-          id: `company-${cid}`,
-          name: companyMap.get(cid)?.name ?? "Unknown",
-          staleDays: null,
-          isCompany: true,
-        }))
-      : [];
-
-    return { nodes: [...contactNodes, ...companyNodes], links: allLinks, activeContactIds };
-  }, [contacts, relationships, hiddenTypes, hideOrphans, visibleContactIds, showCompanyNodes, companyMap]);
+    return { nodes: contactNodes, links: filteredRels, activeContactIds };
+  }, [contacts, relationships, hiddenTypes, hideOrphans, visibleContactIds]);
 
   // Stable ref for graphData to pass to ForceGraph2D (avoids prop identity change on unrelated re-renders)
   const stableGraphData = useMemo(
@@ -174,7 +140,6 @@ export default function GraphClient({
 
   const handleNodeClick = useCallback(
     (node: GraphNode) => {
-      if (node.isCompany) return;
       router.push(`/contacts/${node.id}`);
     },
     [router]
@@ -186,26 +151,6 @@ export default function GraphClient({
       const y = node.y ?? 0;
       const label = node.name;
       const fontSize = Math.max(10, 14 / globalScale);
-
-      if (node.isCompany) {
-        // Company: square/diamond shape in purple
-        const size = 8;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(Math.PI / 4);
-        ctx.fillStyle = "#8b5cf6";
-        ctx.fillRect(-size / 2, -size / 2, size, size);
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(-size / 2, -size / 2, size, size);
-        ctx.restore();
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillStyle = "#8b5cf6";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(label, x, y + 8);
-        return;
-      }
 
       const r = 6;
       const isActive = graphData.activeContactIds.has(node.id);
@@ -255,9 +200,8 @@ export default function GraphClient({
     el.style.display = "block";
     el.innerHTML = `
       <p class="font-medium text-sm">${node.name}</p>
-      ${node.isCompany ? `<p class="text-xs text-muted-foreground mt-0.5">Company</p>` : ""}
-      ${!node.isCompany && node.staleDays === 0 ? `<p class="text-xs text-muted-foreground mt-0.5">Deprioritized</p>` : ""}
-      ${!node.isCompany ? `<p class="text-xs text-muted-foreground mt-0.5">Click to open</p>` : ""}
+      ${node.staleDays === 0 ? `<p class="text-xs text-muted-foreground mt-0.5">Deprioritized</p>` : ""}
+      <p class="text-xs text-muted-foreground mt-0.5">Click to open</p>
     `;
   }, []);
 
@@ -274,7 +218,7 @@ export default function GraphClient({
       <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
         <h1 className="text-xl font-semibold">Relationship graph</h1>
         <p className="text-sm text-muted-foreground">
-          {graphData.nodes.filter((n) => !n.isCompany).length} contacts · {graphData.links.length} edges
+          {graphData.nodes.length} contacts · {graphData.links.length} edges
         </p>
       </div>
 
@@ -376,15 +320,6 @@ export default function GraphClient({
               />
               <span>Hide isolated contacts</span>
               {orphanCount > 0 && <span className="text-xs text-muted-foreground">({orphanCount})</span>}
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showCompanyNodes}
-                onChange={(e) => setShowCompanyNodes(e.target.checked)}
-                className="rounded"
-              />
-              <span>Show company nodes</span>
             </label>
           </div>
 

@@ -10,7 +10,7 @@ export default async function ContactsPage() {
     prisma.contact.findMany({
       select: {
         id: true, firstName: true, lastName: true, nickname: true,
-        company: { select: { id: true, name: true } }, photo: true, staleDays: true,
+        photo: true, staleDays: true, jobTitle: true,
         emails: { select: { label: true, value: true } },
         phones: { select: { label: true, value: true } },
         tags: { select: { tag: true } },

@@ -7,7 +7,6 @@ const contactInclude = {
   phones: true,
   addresses: true,
   tags: { include: { tag: true } },
-  company: true,
   _count: { select: { interactions: true } },
 };
 
@@ -28,7 +27,7 @@ export async function GET(req: NextRequest) {
                 { firstName: { contains: q, mode: "insensitive" } },
                 { lastName: { contains: q, mode: "insensitive" } },
                 { nickname: { contains: q, mode: "insensitive" } },
-                { company: { name: { contains: q, mode: "insensitive" } } },
+                { jobTitle: { contains: q, mode: "insensitive" } },
                 { emails: { some: { value: { contains: q, mode: "insensitive" } } } },
               ],
             }
@@ -48,22 +47,11 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { emails, phones, addresses, tagIds, companyName, companyId: rawCompanyId, ...rest } = body;
-
-  let companyId = rawCompanyId ?? null;
-  if (!companyId && companyName?.trim()) {
-    const co = await prisma.company.upsert({
-      where: { name: companyName.trim() },
-      create: { name: companyName.trim() },
-      update: {},
-    });
-    companyId = co.id;
-  }
+  const { emails, phones, addresses, tagIds, ...rest } = body;
 
   const contact = await prisma.contact.create({
     data: {
       ...rest,
-      companyId: companyId ?? undefined,
       emails: emails?.length ? { create: emails } : undefined,
       phones: phones?.length ? { create: phones } : undefined,
       addresses: addresses?.length ? { create: addresses } : undefined,
