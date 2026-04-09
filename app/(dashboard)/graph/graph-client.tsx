@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Eye, EyeOff } from "lucide-react";
+import { X, Eye, EyeOff, SlidersHorizontal } from "lucide-react";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
@@ -88,6 +88,12 @@ export default function GraphClient({
   const [highlightedType, setHighlightedType] = useState<string | null>(null);
   const [hideOrphans, setHideOrphans] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+
+  // Default panel closed on mobile
+  useEffect(() => {
+    if (window.innerWidth < 768) setPanelOpen(false);
+  }, []);
 
   function toggleType(type: string) {
     setHiddenTypes((prev) => {
@@ -238,9 +244,20 @@ export default function GraphClient({
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
         <h1 className="text-xl font-semibold">Relationship graph</h1>
-        <p className="text-sm text-muted-foreground">
-          {visibleNodeCount} contacts · {visibleLinkCount} edges
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {visibleNodeCount} contacts · {visibleLinkCount} edges
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setPanelOpen((v) => !v)}
+            title={panelOpen ? "Hide filters" : "Show filters"}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1.5">{panelOpen ? "Hide filters" : "Filters"}</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-1 min-h-0">
@@ -285,7 +302,7 @@ export default function GraphClient({
         </div>
 
         {/* Side panel */}
-        <div className="w-64 border-l bg-card flex flex-col shrink-0 overflow-y-auto">
+        {panelOpen && <div className="w-64 border-l bg-card flex flex-col shrink-0 overflow-y-auto">
 
           {/* Relationship type filters */}
           <div className="p-3 border-b">
@@ -372,7 +389,7 @@ export default function GraphClient({
               </div>
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );
