@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X, Eye, EyeOff, SlidersHorizontal } from "lucide-react";
+import type { SigmaGraphData } from "./sigma-graph";
 
-const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
+const SigmaGraph = dynamic(() => import("./sigma-graph"), { ssr: false });
 
 type Contact = {
   id: string;
@@ -40,13 +40,6 @@ function getColor(type: string) {
   return RELATIONSHIP_COLORS[type] ?? "#94a3b8";
 }
 
-type GraphNode = {
-  id: string;
-  name: string;
-  staleDays: number | null;
-};
-type GraphLink = { source: string; target: string; type: string };
-
 export default function GraphClient({
   contacts,
   relationships,
@@ -56,29 +49,6 @@ export default function GraphClient({
   relationships: Relationship[];
   tags: Tag[];
 }) {
-  const router = useRouter();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const graphRef = useRef<any>(null);
-
-  useEffect(() => {
-    function update() {
-      if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-      }
-    }
-    update();
-    const ro = new ResizeObserver(update);
-    if (containerRef.current) ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  // All unique relationship types in the data
   const allTypes = useMemo(
     () => [...new Set(relationships.map((r) => r.type))].sort(),
     [relationships]
@@ -87,13 +57,9 @@ export default function GraphClient({
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
   const [highlightedType, setHighlightedType] = useState<string | null>(null);
   const [hideOrphans, setHideOrphans] = useState(false);
+  const [showTagNodes, setShowTagNodes] = useState(true);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
-
-  // Default panel closed on mobile
-  useEffect(() => {
-    if (window.innerWidth < 768) setPanelOpen(false);
-  }, []);
 
   function toggleType(type: string) {
     setHiddenTypes((prev) => {
@@ -104,23 +70,13 @@ export default function GraphClient({
     });
   }
 
-  // The full graph data — never changes based on filters (prevents ForceGraph2D from resetting viewport)
-  const stableGraphData = useMemo(() => ({
-    nodes: contacts.map((c) => ({
-      id: c.id,
-      name: `${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`,
-      staleDays: c.staleDays,
-    })),
-    links: relationships.map((r) => ({ source: r.fromId, target: r.toId, type: r.type })),
-  }), [contacts, relationships]);
-
-  // Contacts visible due to tag filter
+  // Contacts visible under the current tag filter
   const tagVisibleIds = useMemo(() => {
     if (!activeTagId) return null;
     return new Set(contacts.filter((c) => c.tags.some((t) => t.tagId === activeTagId)).map((c) => c.id));
   }, [contacts, activeTagId]);
 
-  // Active contact IDs = contacts that have at least one visible (non-hidden-type, tag-filtered) link
+  // Contact IDs that participate in at least one visible relationship edge (or tag edge when showTagNodes)
   const activeContactIds = useMemo(() => {
     const ids = new Set<string>();
     for (const r of relationships) {
@@ -129,116 +85,103 @@ export default function GraphClient({
       ids.add(r.fromId);
       ids.add(r.toId);
     }
+    // When showing tag nodes, contacts with at least one tag are also "connected"
+    if (showTagNodes) {
+      for (const c of contacts) {
+        if (tagVisibleIds && !tagVisibleIds.has(c.id)) continue;
+        const relevantTags = activeTagId
+          ? c.tags.filter((t) => t.tagId === activeTagId)
+          : c.tags;
+        if (relevantTags.length > 0) ids.add(c.id);
+      }
+    }
     return ids;
-  }, [relationships, hiddenTypes, tagVisibleIds]);
+  }, [relationships, hiddenTypes, tagVisibleIds, showTagNodes, contacts, activeTagId]);
 
-  // Visibility callbacks — filters without changing graphData, so viewport is preserved
-  const nodeVisibility = useCallback((node: GraphNode) => {
-    if (tagVisibleIds && !tagVisibleIds.has(node.id)) return false;
-    if (hideOrphans && !activeContactIds.has(node.id)) return false;
-    return true;
-  }, [tagVisibleIds, hideOrphans, activeContactIds]);
+  // Build the graph data passed to Sigma
+  const sigmaData = useMemo((): SigmaGraphData => {
+    const nodes: SigmaGraphData["nodes"] = [];
+    const edges: SigmaGraphData["edges"] = [];
 
-  const linkVisibility = useCallback((link: GraphLink) => {
-    const src = typeof link.source === "object" ? (link.source as GraphNode).id : link.source;
-    const tgt = typeof link.target === "object" ? (link.target as GraphNode).id : link.target;
-    if (hiddenTypes.has(link.type)) return false;
-    if (tagVisibleIds && (!tagVisibleIds.has(src) || !tagVisibleIds.has(tgt))) return false;
-    return true;
-  }, [hiddenTypes, tagVisibleIds]);
-
-  // Stats for header
-  const visibleNodeCount = useMemo(() => {
-    let count = 0;
+    // Contact nodes
     for (const c of contacts) {
       if (tagVisibleIds && !tagVisibleIds.has(c.id)) continue;
       if (hideOrphans && !activeContactIds.has(c.id)) continue;
-      count++;
+      nodes.push({
+        id: c.id,
+        label: `${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`,
+        nodeType: "contact",
+        color: c.staleDays === 0 ? "#cbd5e1" : activeContactIds.has(c.id) ? "#6366f1" : "#94a3b8",
+        size: 6,
+      });
     }
-    return count;
-  }, [contacts, tagVisibleIds, hideOrphans, activeContactIds]);
 
-  const visibleLinkCount = useMemo(() => {
-    let count = 0;
+    const visibleContactIds = new Set(nodes.map((n) => n.id));
+
+    // Relationship edges
     for (const r of relationships) {
+      if (!visibleContactIds.has(r.fromId) || !visibleContactIds.has(r.toId)) continue;
       if (hiddenTypes.has(r.type)) continue;
-      if (tagVisibleIds && (!tagVisibleIds.has(r.fromId) || !tagVisibleIds.has(r.toId))) continue;
-      count++;
+      const dimmed = !!highlightedType && highlightedType !== r.type;
+      edges.push({
+        id: r.id,
+        source: r.fromId,
+        target: r.toId,
+        color: dimmed ? "rgba(148,163,184,0.15)" : getColor(r.type),
+        width: dimmed ? 0.5 : 1.5,
+      });
     }
-    return count;
-  }, [relationships, hiddenTypes, tagVisibleIds]);
+
+    // Tag nodes + tag edges
+    if (showTagNodes) {
+      const usedTagIds = new Set<string>();
+      for (const c of contacts) {
+        if (!visibleContactIds.has(c.id)) continue;
+        for (const t of c.tags) {
+          if (activeTagId && t.tagId !== activeTagId) continue;
+          usedTagIds.add(t.tagId);
+        }
+      }
+
+      for (const tag of tags) {
+        if (!usedTagIds.has(tag.id)) continue;
+        nodes.push({
+          id: `tag:${tag.id}`,
+          label: tag.name,
+          nodeType: "tag",
+          color: tag.color ?? "#94a3b8",
+          size: 10,
+        });
+      }
+
+      let tagEdgeIdx = 0;
+      for (const c of contacts) {
+        if (!visibleContactIds.has(c.id)) continue;
+        for (const t of c.tags) {
+          if (!usedTagIds.has(t.tagId)) continue;
+          edges.push({
+            id: `tag-edge-${tagEdgeIdx++}`,
+            source: c.id,
+            target: `tag:${t.tagId}`,
+            color: tags.find((tg) => tg.id === t.tagId)?.color ?? "#94a3b8",
+            width: 1,
+          });
+        }
+      }
+    }
+
+    return { nodes, edges };
+  }, [contacts, relationships, tags, hiddenTypes, highlightedType, hideOrphans,
+      tagVisibleIds, activeContactIds, showTagNodes, activeTagId]);
+
+  // Stats for header
+  const contactNodeCount = sigmaData.nodes.filter((n) => n.nodeType === "contact").length;
+  const relationshipEdgeCount = sigmaData.edges.filter((e) => !e.id.startsWith("tag-edge-")).length;
 
   const orphanCount = useMemo(() => {
     const base = tagVisibleIds ? contacts.filter((c) => tagVisibleIds.has(c.id)) : contacts;
     return base.filter((c) => !activeContactIds.has(c.id)).length;
   }, [contacts, tagVisibleIds, activeContactIds]);
-
-  const handleNodeClick = useCallback(
-    (node: GraphNode) => {
-      router.push(`/contacts/${node.id}`);
-    },
-    [router]
-  );
-
-  const nodeCanvasObject = useCallback(
-    (node: GraphNode & { x?: number; y?: number }, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const x = node.x ?? 0;
-      const y = node.y ?? 0;
-      const label = node.name;
-      const fontSize = Math.max(10, 14 / globalScale);
-
-      const r = 6;
-      const isActive = activeContactIds.has(node.id);
-      const isDeprioritized = node.staleDays === 0;
-
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, 2 * Math.PI);
-      ctx.fillStyle = isDeprioritized ? "#cbd5e1" : isActive ? "#6366f1" : "#94a3b8";
-      ctx.fill();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      ctx.font = `${fontSize}px sans-serif`;
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText(label, x, y + r + 2);
-    },
-    [activeContactIds]
-  );
-
-  const linkColor = useCallback(
-    (link: GraphLink) => {
-      if (highlightedType && link.type !== highlightedType) return "rgba(148,163,184,0.15)";
-      return getColor(link.type);
-    },
-    [highlightedType]
-  );
-
-  const linkWidth = useCallback(
-    (link: GraphLink) => {
-      if (highlightedType && link.type !== highlightedType) return 0.5;
-      return 1.5;
-    },
-    [highlightedType]
-  );
-
-  // DOM-based tooltip to avoid re-renders moving the graph
-  const handleNodeHover = useCallback((node: (GraphNode & { x?: number; y?: number }) | null) => {
-    const el = tooltipRef.current;
-    if (!el) return;
-    if (!node) {
-      el.style.display = "none";
-      return;
-    }
-    el.style.display = "block";
-    el.innerHTML = `
-      <p class="font-medium text-sm">${node.name}</p>
-      ${node.staleDays === 0 ? `<p class="text-xs text-muted-foreground mt-0.5">Deprioritized</p>` : ""}
-      <p class="text-xs text-muted-foreground mt-0.5">Click to open</p>
-    `;
-  }, []);
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -246,7 +189,7 @@ export default function GraphClient({
         <h1 className="text-xl font-semibold">Relationship graph</h1>
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted-foreground">
-            {visibleNodeCount} contacts · {visibleLinkCount} edges
+            {contactNodeCount} contacts · {relationshipEdgeCount} edges
           </p>
           <Button
             variant="ghost"
@@ -261,135 +204,111 @@ export default function GraphClient({
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* Graph canvas — relative for tooltip overlay */}
-        <div ref={containerRef} className="flex-1 bg-muted/20 overflow-hidden relative">
-          <ForceGraph2D
-            ref={graphRef}
-            graphData={stableGraphData}
-            width={dimensions.width}
-            height={dimensions.height}
-            nodeVisibility={nodeVisibility as never}
-            linkVisibility={linkVisibility as never}
-            nodeCanvasObject={nodeCanvasObject as never}
-            nodePointerAreaPaint={((node: GraphNode & { x?: number; y?: number }, color: string, ctx: CanvasRenderingContext2D) => {
-              ctx.beginPath();
-              ctx.arc(node.x ?? 0, node.y ?? 0, 10, 0, 2 * Math.PI);
-              ctx.fillStyle = color;
-              ctx.fill();
-            }) as never}
-            linkColor={linkColor as never}
-            linkWidth={linkWidth as never}
-            onNodeClick={handleNodeClick as never}
-            onNodeHover={handleNodeHover as never}
-            nodeLabel=""
-            linkDirectionalParticles={0}
-            cooldownTicks={150}
-            d3AlphaDecay={0.02}
-            d3VelocityDecay={0.3}
-            onEngineStop={() => {
-              if (graphRef.current) {
-                graphRef.current.d3Force("charge")?.strength(-150);
-              }
-            }}
-          />
-
-          {/* DOM-based tooltip — no React state updates */}
-          <div
-            ref={tooltipRef}
-            style={{ display: "none" }}
-            className="absolute top-3 left-3 pointer-events-none z-10 rounded-md border bg-card/95 backdrop-blur-sm shadow-md px-3 py-2"
-          />
+        {/* Graph canvas */}
+        <div className="flex-1 bg-muted/20 overflow-hidden relative h-full">
+          <SigmaGraph data={sigmaData} />
         </div>
 
         {/* Side panel */}
-        {panelOpen && <div className="w-64 border-l bg-card flex flex-col shrink-0 overflow-y-auto">
+        {panelOpen && (
+          <div className="w-64 border-l bg-card flex flex-col shrink-0 overflow-y-auto">
 
-          {/* Relationship type filters */}
-          <div className="p-3 border-b">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Relationship types</p>
-            {allTypes.length === 0 && (
-              <p className="text-xs text-muted-foreground">No relationships yet.</p>
-            )}
-            <div className="space-y-1">
-              {allTypes.map((type) => {
-                const hidden = hiddenTypes.has(type);
-                const highlighted = highlightedType === type;
-                return (
-                  <div key={type} className="flex items-center gap-1.5">
-                    <button
-                      className={`flex flex-1 items-center gap-2 px-2 py-1 rounded text-sm text-left transition-opacity ${hidden ? "opacity-30" : ""}`}
-                      onClick={() => toggleType(type)}
-                      title={hidden ? "Show this type" : "Hide this type"}
-                    >
-                      <span
-                        className="h-2.5 w-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: getColor(type) }}
-                      />
-                      <span className="capitalize truncate flex-1">{type}</span>
-                    </button>
-                    <button
-                      className={`text-xs px-1.5 py-0.5 rounded border shrink-0 transition-colors ${highlighted ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:bg-muted border-transparent"}`}
-                      onClick={() => setHighlightedType(highlighted ? null : type)}
-                      title={highlighted ? "Stop highlighting" : "Highlight only this type"}
-                    >
-                      {highlighted ? <X className="h-3 w-3" /> : "HL"}
-                    </button>
-                    <button
-                      className="text-muted-foreground hover:text-foreground"
-                      onClick={() => toggleType(type)}
-                      title={hidden ? "Show" : "Hide"}
-                    >
-                      {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Display options */}
-          <div className="p-3 border-b space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Display</p>
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={hideOrphans}
-                onChange={(e) => setHideOrphans(e.target.checked)}
-                className="rounded"
-              />
-              <span>Hide isolated contacts</span>
-              {orphanCount > 0 && <span className="text-xs text-muted-foreground">({orphanCount})</span>}
-            </label>
-          </div>
-
-          {/* Tag filter */}
-          {tags.length > 0 && (
-            <div className="p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Filter by tag</p>
-              <div className="flex flex-wrap gap-1.5">
-                {activeTagId && (
-                  <button
-                    className="text-xs text-muted-foreground hover:text-foreground underline"
-                    onClick={() => setActiveTagId(null)}
-                  >
-                    Clear
-                  </button>
-                )}
-                {tags.map((tag) => (
-                  <Badge
-                    key={tag.id}
-                    variant={activeTagId === tag.id ? "default" : "outline"}
-                    className="cursor-pointer text-xs"
-                    style={tag.color && activeTagId !== tag.id ? { borderColor: tag.color, color: tag.color } : {}}
-                    onClick={() => setActiveTagId(activeTagId === tag.id ? null : tag.id)}
-                  >
-                    {tag.name}
-                  </Badge>
-                ))}
+            {/* Relationship type filters */}
+            <div className="p-3 border-b">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Relationship types</p>
+              {allTypes.length === 0 && (
+                <p className="text-xs text-muted-foreground">No relationships yet.</p>
+              )}
+              <div className="space-y-1">
+                {allTypes.map((type) => {
+                  const hidden = hiddenTypes.has(type);
+                  const highlighted = highlightedType === type;
+                  return (
+                    <div key={type} className="flex items-center gap-1.5">
+                      <button
+                        className={`flex flex-1 items-center gap-2 px-2 py-1 rounded text-sm text-left transition-opacity ${hidden ? "opacity-30" : ""}`}
+                        onClick={() => toggleType(type)}
+                        title={hidden ? "Show this type" : "Hide this type"}
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: getColor(type) }}
+                        />
+                        <span className="capitalize truncate flex-1">{type}</span>
+                      </button>
+                      <button
+                        className={`text-xs px-1.5 py-0.5 rounded border shrink-0 transition-colors ${highlighted ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:bg-muted border-transparent"}`}
+                        onClick={() => setHighlightedType(highlighted ? null : type)}
+                        title={highlighted ? "Stop highlighting" : "Highlight only this type"}
+                      >
+                        {highlighted ? <X className="h-3 w-3" /> : "HL"}
+                      </button>
+                      <button
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => toggleType(type)}
+                        title={hidden ? "Show" : "Hide"}
+                      >
+                        {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          )}
-        </div>}
+
+            {/* Display options */}
+            <div className="p-3 border-b space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Display</p>
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hideOrphans}
+                  onChange={(e) => setHideOrphans(e.target.checked)}
+                  className="rounded"
+                />
+                <span>Hide isolated contacts</span>
+                {orphanCount > 0 && <span className="text-xs text-muted-foreground">({orphanCount})</span>}
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showTagNodes}
+                  onChange={(e) => setShowTagNodes(e.target.checked)}
+                  className="rounded"
+                />
+                <span>Show tags as nodes</span>
+              </label>
+            </div>
+
+            {/* Tag filter */}
+            {tags.length > 0 && (
+              <div className="p-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Filter by tag</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeTagId && (
+                    <button
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                      onClick={() => setActiveTagId(null)}
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {tags.map((tag) => (
+                    <Badge
+                      key={tag.id}
+                      variant={activeTagId === tag.id ? "default" : "outline"}
+                      className="cursor-pointer text-xs"
+                      style={tag.color && activeTagId !== tag.id ? { borderColor: tag.color, color: tag.color } : {}}
+                      onClick={() => setActiveTagId(activeTagId === tag.id ? null : tag.id)}
+                    >
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
