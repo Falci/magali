@@ -75,21 +75,24 @@ export default function ContactsClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold">Contacts</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} people</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {deprioritizedCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowDeprioritized((v) => !v)}
               className="text-muted-foreground"
+              title={showDeprioritized ? "Hide deprioritized" : `${deprioritizedCount} deprioritized hidden`}
             >
-              <EyeOff className="h-4 w-4 mr-1.5" />
-              {showDeprioritized ? "Hide deprioritized" : `+${deprioritizedCount} hidden`}
+              <EyeOff className="h-4 w-4" />
+              <span className="hidden sm:inline ml-1.5">
+                {showDeprioritized ? "Hide deprioritized" : `+${deprioritizedCount} hidden`}
+              </span>
             </Button>
           )}
           <div className="flex rounded-md border overflow-hidden">
@@ -112,9 +115,9 @@ export default function ContactsClient({
               <List className="h-4 w-4" />
             </Button>
           </div>
-          <Button render={<Link href="/contacts/new" />}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add contact
+          <Button render={<Link href="/contacts/new" />} size="sm">
+            <UserPlus className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1.5">Add contact</span>
           </Button>
         </div>
       </div>
