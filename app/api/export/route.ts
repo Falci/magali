@@ -125,50 +125,6 @@ function contactToMarkdown(c: ContactFull): string {
   return md;
 }
 
-// ── Contact → JSON (machine-readable, used for import) ───────────────────────
-
-function contactToJson(c: ContactFull) {
-  return {
-    uid: c.uid,
-    firstName: c.firstName,
-    lastName: c.lastName,
-    nickname: c.nickname,
-    jobTitle: c.jobTitle,
-    gender: c.gender,
-    notes: c.notes,
-    photo: c.photo,
-    birthdayDay: c.birthdayDay,
-    birthdayMonth: c.birthdayMonth,
-    birthdayYear: c.birthdayYear,
-    staleDays: c.staleDays,
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
-    emails: c.emails.map((e) => ({ label: e.label, value: e.value })),
-    phones: c.phones.map((p) => ({ label: p.label, value: p.value })),
-    addresses: c.addresses.map((a) => ({
-      label: a.label,
-      street: a.street,
-      city: a.city,
-      state: a.state,
-      zip: a.zip,
-      country: a.country,
-    })),
-    tags: c.tags.map((ct) => ct.tag.name),
-    interactions: c.interactions.map((i) => ({
-      date: i.date.toISOString(),
-      time: i.time,
-      type: i.type,
-      notes: i.notes,
-    })),
-    relationships: c.relationshipsFrom.map((r) => ({
-      toUid: r.to.uid,
-      toName: [r.to.firstName, r.to.lastName].filter(Boolean).join(" "),
-      type: r.type,
-      notes: r.notes,
-    })),
-  };
-}
-
 // ── Event → Markdown ──────────────────────────────────────────────────────────
 
 function eventToMarkdown(e: EventFull): string {
@@ -192,26 +148,6 @@ function eventToMarkdown(e: EventFull): string {
   if (e.notes) md += `\n## Notes\n\n${e.notes}\n`;
   if (contactName) md += `\n## Contact\n\n[[${contactName}]]\n`;
   return md;
-}
-
-// ── Event → JSON ──────────────────────────────────────────────────────────────
-
-function eventToJson(e: EventFull) {
-  return {
-    uid: e.uid,
-    title: e.title,
-    date: e.date.toISOString(),
-    type: e.type,
-    notes: e.notes,
-    recurring: e.recurring,
-    reminderDaysBefore: e.reminderDaysBefore,
-    contactUid: e.contact?.uid ?? null,
-    contactName: e.contact
-      ? [e.contact.firstName, e.contact.lastName].filter(Boolean).join(" ")
-      : null,
-    createdAt: e.createdAt.toISOString(),
-    updatedAt: e.updatedAt.toISOString(),
-  };
 }
 
 // ── Tags → Markdown ───────────────────────────────────────────────────────────
@@ -272,14 +208,8 @@ export async function GET(req: Request) {
 
   files["tags.md"] = strToU8(tagsToMarkdown(tags));
 
-  // Machine-readable JSON (used by CRM import)
-  files["data/contacts.json"] = strToU8(JSON.stringify(contacts.map(contactToJson), null, 2));
-  files["data/events.json"] = strToU8(JSON.stringify(events.map(eventToJson), null, 2));
-  files["data/tags.json"] = strToU8(JSON.stringify(tags, null, 2));
-
   if (includeSettings && settings) {
     files["settings.json"] = strToU8(JSON.stringify(settings, null, 2));
-    files["data/settings.json"] = strToU8(JSON.stringify(settings, null, 2));
   }
 
   const zipped = zipSync(files, { level: 6 });
