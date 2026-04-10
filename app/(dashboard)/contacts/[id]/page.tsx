@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Mail, Phone, MapPin, Cake, Edit, ArrowLeft } from "lucide-react";
 import { contactAvatarStyle } from "@/lib/contact-color";
-import { TrackView } from "@/components/track-view";
 import DeleteContactButton from "./delete-contact-button";
 import AddInteractionForm from "./add-interaction-form";
 import InteractionLog from "./interaction-log";
@@ -47,6 +46,8 @@ export default async function ContactDetailPage({
 
   if (!contact) notFound();
 
+  void prisma.contact.update({ where: { id }, data: { lastViewedAt: new Date() } });
+
   const allContacts = await prisma.contact.findMany({
     where: { id: { not: id } },
     select: { id: true, firstName: true, lastName: true, gender: true },
@@ -64,7 +65,6 @@ export default async function ContactDetailPage({
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <TrackView contactId={id} />
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" render={<Link href="/contacts" />}>
           <ArrowLeft className="h-4 w-4 mr-1" />Contacts

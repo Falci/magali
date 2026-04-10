@@ -176,8 +176,8 @@ export default function ImportSettingsClient() {
         <CardHeader>
           <CardTitle>Import from CRM export</CardTitle>
           <CardDescription>
-            Restore from a ZIP file previously exported by this app. Contacts and events that already
-            exist (matched by uid) are skipped.
+            Restore from a ZIP file previously exported by this app (contacts.json, events.json,
+            tags.json). Contacts and events that already exist (matched by uid) are skipped.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -326,8 +326,8 @@ export default function ImportSettingsClient() {
         <CardHeader>
           <CardTitle>Export</CardTitle>
           <CardDescription>
-            Download all your data as a ZIP file. Contacts and events are exported as Markdown files
-            compatible with Obsidian and re-importable into another instance.
+            Download all your data as a ZIP file containing contacts.json, events.json, and
+            tags.json — re-importable into another instance.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Users, UserPlus, Clock, Eye } from "lucide-react";
+import { CalendarDays, Users, UserPlus, Clock } from "lucide-react";
 import { contactAvatarStyle } from "@/lib/contact-color";
+import { RecentlyViewedStrip } from "@/components/recently-viewed-strip";
 
 const EVENT_EMOJI: Record<string, string> = {
   birthday: "🎂",
@@ -27,7 +28,7 @@ export default async function DashboardPage() {
     prisma.contact.findMany({
       where: { lastViewedAt: { not: null } },
       orderBy: { lastViewedAt: "desc" },
-      take: 6,
+      take: 10,
       select: { id: true, firstName: true, lastName: true, photo: true, jobTitle: true, lastViewedAt: true },
     }),
   ]);
@@ -72,39 +73,10 @@ export default async function DashboardPage() {
       )}
 
       {recentlyViewed.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              Recently viewed
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {recentlyViewed.map((c) => (
-                <Link key={c.id} href={`/contacts/${c.id}`}>
-                  <div className="flex items-center gap-2.5 p-2 rounded-md hover:bg-muted transition-colors text-sm">
-                    <Avatar className="h-8 w-8 shrink-0">
-                      {c.photo ? (
-                        <img src={c.photo} alt="" className="h-full w-full object-cover rounded-full" />
-                      ) : (
-                        <AvatarFallback className="text-xs" style={contactAvatarStyle(c.firstName, c.lastName)}>
-                          {c.firstName[0]}{c.lastName?.[0] ?? ""}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{c.firstName} {c.lastName}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatDistanceToNow(c.lastViewedAt!, { addSuffix: true })}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm text-muted-foreground shrink-0">Recently viewed:</span>
+          <RecentlyViewedStrip contacts={recentlyViewed} />
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
