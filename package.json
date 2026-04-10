@@ -23,6 +23,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "fflate": "^0.8.2",
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.1",
     "ical-generator": "^10.1.0",

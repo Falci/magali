@@ -1,16 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download } from "lucide-react";
+import { Download, Upload, FileArchive } from "lucide-react";
 
 export default function ImportSettingsClient() {
   const router = useRouter();
+
+  // ── Export ────────────────────────────────────────────────────────────────
+  const [includeSettings, setIncludeSettings] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const qs = includeSettings ? "?settings=true" : "";
+      const res = await fetch(`/api/export${qs}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error ?? "Export failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? "crm-export.zip";
+      a.href = url;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export downloaded");
+    } catch {
+      toast.error("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // ── CRM import ────────────────────────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [crmImporting, setCrmImporting] = useState(false);
+  const [crmResult, setCrmResult] = useState<{
+    imported: number;
+    skipped: number;
+    relImported: number;
+    relSkipped: number;
+    evImported: number;
+    evSkipped: number;
+    errors: string[];
+  } | null>(null);
+
+  async function handleCrmImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCrmImporting(true);
+    setCrmResult(null);
+
+    const form = new FormData();
+    form.append("file", file);
+
+    try {
+      const res = await fetch("/api/import/crm", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Import failed");
+        return;
+      }
+      setCrmResult(data);
+      toast.success(`Imported ${data.imported} contacts, ${data.evImported} events`);
+      router.refresh();
+    } catch {
+      toast.error("Import failed");
+    } finally {
+      setCrmImporting(false);
+      // Reset so the same file can be selected again
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  // ── Monica import ─────────────────────────────────────────────────────────
   const [monicaDomain, setMonicaDomain] = useState("");
   const [monicaToken, setMonicaToken] = useState("");
   const [importing, setImporting] = useState(false);
@@ -93,16 +167,99 @@ export default function ImportSettingsClient() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-semibold">Import</h1>
-        <p className="text-sm text-muted-foreground">Import contacts from external services</p>
+        <h1 className="text-2xl font-semibold">Import / Export</h1>
+        <p className="text-sm text-muted-foreground">Back up your data or move it between instances</p>
       </div>
 
+      {/* ── Export ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Export</CardTitle>
+          <CardDescription>
+            Download all your data as a ZIP file. Contacts and events are exported as Markdown files
+            compatible with Obsidian. A machine-readable <code>data/</code> folder is included for
+            re-importing into another instance.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={includeSettings}
+              onChange={(e) => setIncludeSettings(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+            />
+            Include settings (API tokens, SMTP, etc.)
+          </label>
+          <Button onClick={handleExport} disabled={exporting}>
+            <Download className="h-4 w-4 mr-2" />
+            {exporting ? "Preparing…" : "Download export"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── CRM import ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Import from CRM export</CardTitle>
+          <CardDescription>
+            Restore from a ZIP file previously exported by this app. Contacts and events that already
+            exist (matched by uid) are skipped.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            className="hidden"
+            onChange={handleCrmImport}
+          />
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={crmImporting}
+            variant="outline"
+          >
+            <FileArchive className="h-4 w-4 mr-2" />
+            {crmImporting ? "Importing…" : "Choose ZIP file"}
+          </Button>
+
+          {crmResult && (
+            <div className="rounded-md border p-3 text-sm space-y-1">
+              <p className="font-medium">
+                Import complete — {crmResult.imported} contacts, {crmResult.evImported} events,{" "}
+                {crmResult.relImported} relationships
+                {(crmResult.skipped > 0 || crmResult.evSkipped > 0) && (
+                  <span className="text-muted-foreground font-normal">
+                    {" "}
+                    ({crmResult.skipped + crmResult.evSkipped} skipped)
+                  </span>
+                )}
+              </p>
+              {crmResult.errors.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer text-destructive">
+                    {crmResult.errors.length} error(s)
+                  </summary>
+                  <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                    {crmResult.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Monica HQ import ── */}
       <Card>
         <CardHeader>
           <CardTitle>Import from Monica HQ</CardTitle>
           <CardDescription>
-            Enter your Monica instance URL and a personal access token to import all contacts. Partial contacts
-            (added as relationships only) are skipped.
+            Enter your Monica instance URL and a personal access token to import all contacts. Partial
+            contacts (added as relationships only) are skipped.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -157,7 +314,8 @@ export default function ImportSettingsClient() {
               {importResult && (
                 <>
                   <p className="font-medium">
-                    Import complete — {importResult.imported} contacts, {importResult.relImported} relationships
+                    Import complete — {importResult.imported} contacts, {importResult.relImported}{" "}
+                    relationships
                     {(importResult.skipped > 0 || importResult.relSkipped > 0) && (
                       <span className="text-muted-foreground font-normal">
                         {" "}
@@ -184,7 +342,7 @@ export default function ImportSettingsClient() {
             </div>
           )}
           <Button onClick={handleMonicaImport} disabled={importing}>
-            <Download className="h-4 w-4 mr-2" />
+            <Upload className="h-4 w-4 mr-2" />
             {importing ? "Importing…" : "Import contacts"}
           </Button>
         </CardContent>
