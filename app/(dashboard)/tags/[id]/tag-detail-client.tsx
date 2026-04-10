@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Trash2, X } from "lucide-react";
+import { contactAvatarStyle } from "@/lib/contact-color";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -98,7 +99,7 @@ export default function TagDetailClient({ tag: initial }: { tag: Tag }) {
                   {c.photo ? (
                     <img src={c.photo} alt="" className="h-full w-full object-cover rounded-full" />
                   ) : (
-                    <AvatarFallback className="text-xs">{initials(c)}</AvatarFallback>
+                    <AvatarFallback className="text-xs" style={contactAvatarStyle(c.firstName, c.lastName)}>{initials(c)}</AvatarFallback>
                   )}
                 </Avatar>
                 <div className="min-w-0 flex-1">

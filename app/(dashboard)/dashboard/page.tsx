@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Users, UserPlus, Clock } from "lucide-react";
+import { contactAvatarStyle } from "@/lib/contact-color";
 
 const EVENT_EMOJI: Record<string, string> = {
   birthday: "🎂",
@@ -130,7 +131,7 @@ export default async function DashboardPage() {
                         {c.photo ? (
                           <img src={c.photo} alt="" className="h-full w-full object-cover rounded-full" />
                         ) : (
-                          <AvatarFallback className="text-xs">
+                          <AvatarFallback className="text-xs" style={contactAvatarStyle(c.firstName, c.lastName)}>
                             {c.firstName[0]}{c.lastName?.[0] ?? ""}
                           </AvatarFallback>
                         )}

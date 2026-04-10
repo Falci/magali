@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Mail, Phone, MapPin, Cake, Edit, ArrowLeft } from "lucide-react";
+import { contactAvatarStyle } from "@/lib/contact-color";
 import DeleteContactButton from "./delete-contact-button";
 import AddInteractionForm from "./add-interaction-form";
 import InteractionLog from "./interaction-log";
@@ -74,7 +75,7 @@ export default async function ContactDetailPage({
           {contact.photo ? (
             <img src={contact.photo} alt="" className="h-full w-full object-cover rounded-full" />
           ) : (
-            <AvatarFallback className="text-xl">{initials}</AvatarFallback>
+            <AvatarFallback className="text-xl" style={contactAvatarStyle(contact.firstName, contact.lastName)}>{initials}</AvatarFallback>
           )}
         </Avatar>
         <div className="flex-1 min-w-0">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ type Settings = {
 
 export default function GeneralSettingsClient({ initialSettings }: { initialSettings: Settings | null }) {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<Settings>(initialSettings ?? {});
   const [saving, setSaving] = useState(false);
 
@@ -139,6 +141,28 @@ export default function GeneralSettingsClient({ initialSettings }: { initialSett
       <Button onClick={handleSave} disabled={saving}>
         {saving ? "Saving…" : "Save"}
       </Button>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>Choose how Magali looks on your device.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label>Theme</Label>
+            <Select value={theme ?? "system"} onValueChange={(v) => v && setTheme(v)}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="system">System default</SelectItem>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

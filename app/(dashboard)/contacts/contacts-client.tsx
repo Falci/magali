@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserPlus, Search, EyeOff, LayoutGrid, List } from "lucide-react";
+import { contactAvatarStyle } from "@/lib/contact-color";
 
 type Tag = { id: string; name: string; color: string | null };
 type Contact = {
@@ -177,7 +178,7 @@ export default function ContactsClient({
                       {contact.photo ? (
                         <img src={contact.photo} alt="" className="h-full w-full object-cover rounded-full" />
                       ) : (
-                        <AvatarFallback className="text-sm">{initials(contact)}</AvatarFallback>
+                        <AvatarFallback className="text-sm" style={contactAvatarStyle(contact.firstName, contact.lastName)}>{initials(contact)}</AvatarFallback>
                       )}
                     </Avatar>
                     <div className="min-w-0 flex-1">
@@ -217,7 +218,7 @@ export default function ContactsClient({
                 {contact.photo ? (
                   <img src={contact.photo} alt="" className="h-full w-full object-cover rounded-full" />
                 ) : (
-                  <AvatarFallback className="text-xs">{initials(contact)}</AvatarFallback>
+                  <AvatarFallback className="text-xs" style={contactAvatarStyle(contact.firstName, contact.lastName)}>{initials(contact)}</AvatarFallback>
                 )}
               </Avatar>
               <div className="min-w-0 flex-1 flex items-center gap-4">
