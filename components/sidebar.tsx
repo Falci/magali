@@ -34,7 +34,7 @@ const settingsSubItems = [
   { href: "/settings/field-types", label: "Field types" },
   { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/dav", label: "CalDAV / CardDAV" },
-  { href: "/settings/import", label: "Import" },
+  { href: "/settings/import", label: "Import / Export" },
 ];
 
 export default function Sidebar() {

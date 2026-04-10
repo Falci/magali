@@ -171,33 +171,6 @@ export default function ImportSettingsClient() {
         <p className="text-sm text-muted-foreground">Back up your data or move it between instances</p>
       </div>
 
-      {/* ── Export ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Export</CardTitle>
-          <CardDescription>
-            Download all your data as a ZIP file. Contacts and events are exported as Markdown files
-            compatible with Obsidian. A machine-readable <code>data/</code> folder is included for
-            re-importing into another instance.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={includeSettings}
-              onChange={(e) => setIncludeSettings(e.target.checked)}
-              className="h-4 w-4 rounded border-input accent-primary"
-            />
-            Include settings (API tokens, SMTP, etc.)
-          </label>
-          <Button onClick={handleExport} disabled={exporting}>
-            <Download className="h-4 w-4 mr-2" />
-            {exporting ? "Preparing…" : "Download export"}
-          </Button>
-        </CardContent>
-      </Card>
-
       {/* ── CRM import ── */}
       <Card>
         <CardHeader>
@@ -344,6 +317,32 @@ export default function ImportSettingsClient() {
           <Button onClick={handleMonicaImport} disabled={importing}>
             <Upload className="h-4 w-4 mr-2" />
             {importing ? "Importing…" : "Import contacts"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Export ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Export</CardTitle>
+          <CardDescription>
+            Download all your data as a ZIP file. Contacts and events are exported as Markdown files
+            compatible with Obsidian and re-importable into another instance.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={includeSettings}
+              onChange={(e) => setIncludeSettings(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary"
+            />
+            Include settings (API tokens, SMTP, etc.)
+          </label>
+          <Button onClick={handleExport} disabled={exporting}>
+            <Download className="h-4 w-4 mr-2" />
+            {exporting ? "Preparing…" : "Download export"}
           </Button>
         </CardContent>
       </Card>
