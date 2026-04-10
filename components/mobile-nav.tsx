@@ -58,6 +58,7 @@ export default function MobileNav() {
   return (
     <>
       <button
+        id="mobile-nav-trigger"
         type="button"
         onClick={() => setOpen(true)}
         className="md:hidden flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"

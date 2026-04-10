@@ -21,12 +21,12 @@ import {
 } from "lucide-react";
 
 const mainNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/contacts", label: "Contacts", icon: Users },
-  { href: "/tags", label: "Tags", icon: Tag },
-  { href: "/events", label: "Events", icon: CalendarDays },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "D" },
+  { href: "/contacts", label: "Contacts", icon: Users, shortcut: "C" },
+  { href: "/tags", label: "Tags", icon: Tag, shortcut: "T" },
+  { href: "/events", label: "Events", icon: CalendarDays, shortcut: "E" },
   { href: "/calendar", label: "Calendar", icon: Calendar },
-  { href: "/graph", label: "Graph", icon: Network },
+  { href: "/graph", label: "Graph", icon: Network, shortcut: "G" },
 ];
 
 const settingsSubItems = [
@@ -57,10 +57,12 @@ export default function Sidebar() {
         </Link>
       </div>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {mainNavItems.map(({ href, label, icon: Icon }) => (
+        {mainNavItems.map(({ href, label, icon: Icon, shortcut }, index) => (
           <Link
             key={href}
             href={href}
+            data-sidebar-item="true"
+            {...(index === 0 ? { "data-sidebar-first-nav": "true" } : {})}
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
               href !== "/dashboard" && (pathname?.startsWith(href) ?? false)
@@ -71,7 +73,12 @@ export default function Sidebar() {
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {label}
+            <span className="flex-1">{label}</span>
+            {shortcut && (
+              <kbd className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded border border-current/20 bg-current/10 text-[10px] font-mono opacity-60">
+                {shortcut}
+              </kbd>
+            )}
           </Link>
         ))}
 
@@ -79,6 +86,7 @@ export default function Sidebar() {
         <div>
           <button
             type="button"
+            data-sidebar-item="true"
             onClick={() => setSettingsExpanded((v) => !v)}
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full text-left",
@@ -89,6 +97,9 @@ export default function Sidebar() {
           >
             <Settings className="h-4 w-4 shrink-0" />
             <span className="flex-1">Settings</span>
+            <kbd className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded border border-current/20 bg-current/10 text-[10px] font-mono opacity-60 mr-1">
+              S
+            </kbd>
             {settingsExpanded ? (
               <ChevronDown className="h-3.5 w-3.5 shrink-0" />
             ) : (

@@ -31,5 +31,10 @@ export default async function TagDetailPage({
 
   if (!tag) notFound();
 
-  return <TagDetailClient tag={tag} />;
+  const allTags = await prisma.tag.findMany({
+    select: { id: true },
+    orderBy: { name: "asc" },
+  });
+
+  return <TagDetailClient tag={tag} allTagIds={allTags.map((t) => t.id)} />;
 }

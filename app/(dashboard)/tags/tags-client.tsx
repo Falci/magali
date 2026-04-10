@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tag, Plus } from "lucide-react";
+import { isInputFocused } from "@/components/keyboard-handler";
 
 type TagWithCount = {
   id: string;
@@ -21,6 +22,38 @@ export default function TagsClient({ initialTags }: { initialTags: TagWithCount[
   const [tags, setTags] = useState(initialTags);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  // Scroll highlighted tag into view
+  useEffect(() => {
+    if (highlightedIndex >= 0) {
+      document.getElementById(`tag-item-${highlightedIndex}`)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightedIndex]);
+
+  // Arrow key navigation
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isInputFocused()) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setHighlightedIndex((i) => Math.min(i + 1, tags.length - 1));
+      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setHighlightedIndex((i) => Math.max(i - 1, -1));
+      } else if (e.key === "Enter" && highlightedIndex >= 0) {
+        const tag = tags[highlightedIndex];
+        if (tag) router.push(`/tags/${tag.id}`);
+      } else if (e.key === "Escape") {
+        setHighlightedIndex(-1);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [tags, highlightedIndex, router]);
 
   async function createTag(e: React.FormEvent) {
     e.preventDefault();
@@ -72,11 +105,11 @@ export default function TagsClient({ initialTags }: { initialTags: TagWithCount[
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
-          {tags.map((tag) => (
-            <Link key={tag.id} href={`/tags/${tag.id}`}>
+          {tags.map((tag, index) => (
+            <Link key={tag.id} id={`tag-item-${index}`} href={`/tags/${tag.id}`}>
               <Badge
                 variant="outline"
-                className="text-sm px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors"
+                className={`text-sm px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors${highlightedIndex === index ? " ring-2 ring-primary" : ""}`}
                 style={tag.color ? { borderColor: tag.color, color: tag.color } : {}}
               >
                 {tag.name}

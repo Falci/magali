@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -29,9 +29,24 @@ type Tag = {
   contacts: { contact: Contact }[];
 };
 
-export default function TagDetailClient({ tag: initial }: { tag: Tag }) {
+export default function TagDetailClient({ tag: initial, allTagIds }: { tag: Tag; allTagIds: string[] }) {
   const router = useRouter();
   const [tag, setTag] = useState(initial);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.target as HTMLElement)?.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const idx = allTagIds.indexOf(tag.id);
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        if (idx > 0) { e.preventDefault(); router.push(`/tags/${allTagIds[idx - 1]}`); }
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        if (idx < allTagIds.length - 1) { e.preventDefault(); router.push(`/tags/${allTagIds[idx + 1]}`); }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [tag.id, allTagIds, router]);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 

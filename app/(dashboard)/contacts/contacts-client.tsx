@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserPlus, Search, EyeOff, LayoutGrid, List } from "lucide-react";
 import { contactAvatarStyle } from "@/lib/contact-color";
+import { cn } from "@/lib/utils";
+import { isInputFocused } from "@/components/keyboard-handler";
 
 type Tag = { id: string; name: string; color: string | null };
 type Contact = {
@@ -32,10 +35,12 @@ export default function ContactsClient({
   initialContacts: Contact[];
   tags: Tag[];
 }) {
+  const router = useRouter();
   const [q, setQ] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showDeprioritized, setShowDeprioritized] = useState(false);
   const [view, setView] = useState<"cards" | "list">("cards");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   useEffect(() => {
     const saved = localStorage.getItem("contacts-view");
@@ -67,6 +72,42 @@ export default function ContactsClient({
       return matchesQ && matchesTag;
     });
   }, [initialContacts, q, activeTag, showDeprioritized]);
+
+  // Reset highlight when filters change
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [q, activeTag, showDeprioritized]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0) {
+      document.getElementById(`contact-item-${highlightedIndex}`)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightedIndex]);
+
+  // Arrow key navigation
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isInputFocused()) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((i) => Math.min(i + 1, filtered.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((i) => Math.max(i - 1, -1));
+      } else if (e.key === "Enter" && highlightedIndex >= 0) {
+        const contact = filtered[highlightedIndex];
+        if (contact) router.push(`/contacts/${contact.id}`);
+      } else if (e.key === "Escape") {
+        setHighlightedIndex(-1);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [filtered, highlightedIndex, router]);
 
   const deprioritizedCount = initialContacts.filter((c) => c.staleDays === 0).length;
 
@@ -169,9 +210,9 @@ export default function ContactsClient({
         </div>
       ) : view === "cards" ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((contact) => (
-            <Link key={contact.id} href={`/contacts/${contact.id}`}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          {filtered.map((contact, index) => (
+            <Link key={contact.id} id={`contact-item-${index}`} href={`/contacts/${contact.id}`}>
+              <Card className={cn("hover:shadow-md transition-shadow cursor-pointer", highlightedIndex === index && "ring-2 ring-primary")}>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10 shrink-0">
@@ -212,8 +253,8 @@ export default function ContactsClient({
         </div>
       ) : (
         <div className="rounded-md border divide-y">
-          {filtered.map((contact) => (
-            <Link key={contact.id} href={`/contacts/${contact.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors">
+          {filtered.map((contact, index) => (
+            <Link key={contact.id} id={`contact-item-${index}`} href={`/contacts/${contact.id}`} className={cn("flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors", highlightedIndex === index && "bg-muted")}>
               <Avatar className="h-7 w-7 shrink-0">
                 {contact.photo ? (
                   <img src={contact.photo} alt="" className="h-full w-full object-cover rounded-full" />

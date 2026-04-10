@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/session";
 import Sidebar from "@/components/sidebar";
 import MobileNav from "@/components/mobile-nav";
 import HeaderSearch from "@/components/header-search";
+import KeyboardHandler from "@/components/keyboard-handler";
 
 export default async function DashboardLayout({
   children,
@@ -19,6 +20,7 @@ export default async function DashboardLayout({
         </header>
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">{children}</main>
       </div>
+      <KeyboardHandler />
     </div>
   );
 }
