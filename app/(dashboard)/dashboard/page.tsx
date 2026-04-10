@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Users, UserPlus, Clock } from "lucide-react";
+import { CalendarDays, Users, UserPlus, Clock, Eye } from "lucide-react";
 import { contactAvatarStyle } from "@/lib/contact-color";
 
 const EVENT_EMOJI: Record<string, string> = {
@@ -19,11 +19,17 @@ const EVENT_EMOJI: Record<string, string> = {
 
 export default async function DashboardPage() {
   const session = await requireSession();
-  const [upcomingEvents, settings, totalContacts, scheduledInteractions] = await Promise.all([
+  const [upcomingEvents, settings, totalContacts, scheduledInteractions, recentlyViewed] = await Promise.all([
     getUpcomingEvents(30),
     prisma.settings.findUnique({ where: { id: "singleton" }, select: { staleDays: true } }),
     prisma.contact.count(),
     getScheduledInteractions(),
+    prisma.contact.findMany({
+      where: { lastViewedAt: { not: null } },
+      orderBy: { lastViewedAt: "desc" },
+      take: 6,
+      select: { id: true, firstName: true, lastName: true, photo: true, jobTitle: true, lastViewedAt: true },
+    }),
   ]);
   const globalStaleDays = settings?.staleDays ?? 90;
   const staleContacts = await getStaleContacts(globalStaleDays);
@@ -59,6 +65,42 @@ export default async function DashboardPage() {
                     <p className="text-xs text-muted-foreground">{format(i.date, "MMM d")}</p>
                   </div>
                 </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {recentlyViewed.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Recently viewed
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {recentlyViewed.map((c) => (
+                <Link key={c.id} href={`/contacts/${c.id}`}>
+                  <div className="flex items-center gap-2.5 p-2 rounded-md hover:bg-muted transition-colors text-sm">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      {c.photo ? (
+                        <img src={c.photo} alt="" className="h-full w-full object-cover rounded-full" />
+                      ) : (
+                        <AvatarFallback className="text-xs" style={contactAvatarStyle(c.firstName, c.lastName)}>
+                          {c.firstName[0]}{c.lastName?.[0] ?? ""}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{c.firstName} {c.lastName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {formatDistanceToNow(c.lastViewedAt!, { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
           </CardContent>
